@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: careerbuilder-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: "false"
