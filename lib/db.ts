@@ -2,6 +2,7 @@ import fs from "fs"
 import path from "path"
 
 const DATA_DIR = path.join(process.cwd(), "data")
+const memoryStore = new Map<string, unknown[]>()
 
 function ensureDir() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -12,18 +13,27 @@ function ensureDir() {
 export function readCollection<T>(name: string): T[] {
   ensureDir()
   const filePath = path.join(DATA_DIR, `${name}.json`)
-  if (!fs.existsSync(filePath)) return []
+  if (!fs.existsSync(filePath)) {
+    return ((memoryStore.get(name) as T[] | undefined) || []).map((item) => ({ ...item }))
+  }
   try {
-    return JSON.parse(fs.readFileSync(filePath, "utf-8"))
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8")) as T[]
+    memoryStore.set(name, parsed)
+    return parsed
   } catch {
-    return []
+    return ((memoryStore.get(name) as T[] | undefined) || []).map((item) => ({ ...item }))
   }
 }
 
 export function writeCollection<T>(name: string, data: T[]): void {
   ensureDir()
   const filePath = path.join(DATA_DIR, `${name}.json`)
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2))
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2))
+  } catch {
+    // Some hosted runtimes use read-only filesystems; keep app functional in-memory.
+  }
+  memoryStore.set(name, data)
 }
 
 export function findOne<T extends { id: string }>(

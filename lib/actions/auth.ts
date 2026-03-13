@@ -3,18 +3,20 @@
 import { hashSync, compareSync } from "bcryptjs"
 import { v4 as uuid } from "uuid"
 import { redirect } from "next/navigation"
-import { findOne, insertOne, updateOne } from "../db"
+import { findOne, insertOne, readCollection, updateOne } from "../db"
 import { setSessionCookie, clearSessionCookie, getCurrentUser } from "../auth"
 import { seedDatabase } from "../seed"
 import type { User } from "../types"
-import fs from "fs"
-import path from "path"
+
+let seeded = false
 
 function ensureSeeded() {
-  const usersFile = path.join(process.cwd(), "data", "users.json")
-  if (!fs.existsSync(usersFile)) {
+  if (seeded) return
+  const users = readCollection<User>("users")
+  if (users.length === 0) {
     seedDatabase()
   }
+  seeded = true
 }
 
 export async function loginAction(formData: FormData) {
@@ -41,7 +43,7 @@ export async function loginAction(formData: FormData) {
   }
 
   await setSessionCookie(user.id)
-  redirect("/dashboard")
+  return { success: true }
 }
 
 export async function signupAction(formData: FormData) {
@@ -92,7 +94,7 @@ export async function signupAction(formData: FormData) {
 
   insertOne("users", user)
   await setSessionCookie(user.id)
-  redirect("/dashboard")
+  return { success: true }
 }
 
 export async function logoutAction() {

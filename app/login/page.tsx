@@ -10,6 +10,7 @@ import { Rocket, Eye, EyeOff, ArrowRight } from "lucide-react"
 import { loginAction } from "@/lib/actions/auth"
 
 export default function LoginPage() {
+  const router = useRouter()
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -21,9 +22,11 @@ export default function LoginPage() {
       const result = await loginAction(formData)
       if (result?.error) {
         setError(result.error)
+      } else if (result?.success) {
+        router.push("/dashboard")
       }
     } catch {
-      // redirect throws, which is expected on success
+      setError("Something went wrong. Please try again.")
     } finally {
       setLoading(false)
     }

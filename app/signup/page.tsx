@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -9,6 +10,7 @@ import { Rocket, Eye, EyeOff, ArrowRight } from "lucide-react"
 import { signupAction } from "@/lib/actions/auth"
 
 export default function SignupPage() {
+  const router = useRouter()
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -20,9 +22,11 @@ export default function SignupPage() {
       const result = await signupAction(formData)
       if (result?.error) {
         setError(result.error)
+      } else if (result?.success) {
+        router.push("/dashboard")
       }
     } catch {
-      // redirect throws on success
+      setError("Something went wrong. Please try again.")
     } finally {
       setLoading(false)
     }
