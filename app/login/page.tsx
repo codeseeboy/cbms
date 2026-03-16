@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Rocket, Eye, EyeOff, ArrowRight } from "lucide-react"
-import { loginAction } from "@/lib/actions/auth"
+
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4002"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -21,10 +22,30 @@ export default function LoginPage() {
     setError("")
     try {
       const formData = new FormData(event.currentTarget)
-      const result = await loginAction(formData)
-      if (result?.error) {
-        setError(result.error)
-      } else if (result?.success) {
+      const payload = {
+        email: String(formData.get("email") || ""),
+        password: String(formData.get("password") || ""),
+      }
+
+      const authResponse = await fetch(`${API}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      const authData = await authResponse.json()
+      if (!authResponse.ok || !authData?.success || !authData?.user?.id) {
+        setError(authData?.error || "Login failed")
+      } else {
+        const sessionResponse = await fetch("/api/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: authData.user.id }),
+        })
+        if (!sessionResponse.ok) {
+          setError("Login succeeded but failed to create session")
+          return
+        }
         router.push("/dashboard")
       }
     } catch {

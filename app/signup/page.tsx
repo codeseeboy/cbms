@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Rocket, Eye, EyeOff, ArrowRight } from "lucide-react"
-import { signupAction } from "@/lib/actions/auth"
+
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4002"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -21,10 +22,32 @@ export default function SignupPage() {
     setError("")
     try {
       const formData = new FormData(event.currentTarget)
-      const result = await signupAction(formData)
-      if (result?.error) {
-        setError(result.error)
-      } else if (result?.success) {
+      const payload = {
+        name: String(formData.get("name") || ""),
+        email: String(formData.get("email") || ""),
+        password: String(formData.get("password") || ""),
+        role: String(formData.get("role") || "jobseeker"),
+      }
+
+      const authResponse = await fetch(`${API}/api/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      const authData = await authResponse.json()
+      if (!authResponse.ok || !authData?.success || !authData?.user?.id) {
+        setError(authData?.error || "Signup failed")
+      } else {
+        const sessionResponse = await fetch("/api/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: authData.user.id }),
+        })
+        if (!sessionResponse.ok) {
+          setError("Signup succeeded but failed to create session")
+          return
+        }
         router.push("/dashboard")
       }
     } catch {

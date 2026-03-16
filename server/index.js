@@ -3,6 +3,9 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const { MongoClient } = require("mongodb");
+const { hashSync, compareSync } = require("bcryptjs");
+const { randomUUID } = require("crypto");
 const { getTemplate } = require("./templates");
 const { parseResumeText } = require("./parser");
 const { calculateATSScore } = require("./ats-scorer");
@@ -11,6 +14,8 @@ const { generateCertificateHTML } = require("./certificate");
 
 const app = express();
 const PORT = process.env.PORT || 4002;
+const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_DB = process.env.MONGODB_DB || "careerbuilder";
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",")
@@ -32,6 +37,22 @@ const upload = multer({
 });
 
 let browserInstance = null;
+let mongoClientPromise = null;
+
+function getMongoClient() {
+  if (!MONGODB_URI) {
+    throw new Error("Missing MONGODB_URI in backend environment");
+  }
+  if (!mongoClientPromise) {
+    mongoClientPromise = new MongoClient(MONGODB_URI).connect();
+  }
+  return mongoClientPromise;
+}
+
+async function getDb() {
+  const client = await getMongoClient();
+  return client.db(MONGODB_DB);
+}
 
 async function getBrowser() {
   if (browserInstance) return browserInstance;
@@ -52,6 +73,102 @@ async function getBrowser() {
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "CareerBuilder Resume Server", port: PORT });
+});
+
+// Auth endpoints for frontend login/signup via backend only
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, error: "Email and password are required" });
+    }
+
+    const db = await getDb();
+    const user = await db.collection("users").findOne({ email });
+    if (!user) {
+      return res.status(401).json({ success: false, error: "Invalid email or password" });
+    }
+
+    if (!compareSync(password, String(user.password || ""))) {
+      return res.status(401).json({ success: false, error: "Invalid email or password" });
+    }
+
+    return res.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+      },
+    });
+  } catch (err) {
+    console.error("Auth login error:", err);
+    return res.status(500).json({ success: false, error: "Failed to login" });
+  }
+});
+
+app.post("/api/auth/signup", async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+    const role = String(req.body?.role || "jobseeker");
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, error: "All fields are required" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, error: "Password must be at least 6 characters" });
+    }
+
+    const db = await getDb();
+    const existing = await db.collection("users").findOne({ email }, { projection: { _id: 1 } });
+    if (existing) {
+      return res.status(409).json({ success: false, error: "An account with this email already exists" });
+    }
+
+    const user = {
+      id: randomUUID(),
+      name,
+      email,
+      password: hashSync(password, 10),
+      role,
+      phone: "",
+      location: "",
+      title: "",
+      bio: "",
+      skills: [],
+      avatar: name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await db.collection("users").insertOne(user);
+
+    return res.status(201).json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+      },
+    });
+  } catch (err) {
+    console.error("Auth signup error:", err);
+    return res.status(500).json({ success: false, error: "Failed to sign up" });
+  }
 });
 
 app.post("/api/resume/preview", (req, res) => {
@@ -336,6 +453,8 @@ app.listen(PORT, () => {
   console.log(`    POST /api/job/scrape-url    - Scrape job URL`);
   console.log(`    POST /api/job/match         - Resume vs JD matching`);
   console.log(`    POST /api/job/suggestions   - Suggested jobs`);
+  console.log(`    POST /api/auth/login        - Auth login`);
+  console.log(`    POST /api/auth/signup       - Auth signup`);
   console.log(`    POST /api/certificate/download - Certificate PDF`);
   console.log(`    POST /api/certificate/preview  - Certificate preview\n`);
 });
