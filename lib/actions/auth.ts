@@ -59,7 +59,7 @@ export async function loginAction(formData: FormData) {
     ) {
       return {
         error:
-          "Database connection failed. Set a valid MONGODB_URI in your .env and restart the dev server.",
+          "Database connection failed. Configure a valid MONGODB_URI in your deployment environment and redeploy.",
       }
     }
     return { error: "Unable to login right now. Please try again." }
@@ -126,7 +126,7 @@ export async function signupAction(formData: FormData) {
     ) {
       return {
         error:
-          "Database connection failed. Set a valid MONGODB_URI in your .env and restart the dev server.",
+          "Database connection failed. Configure a valid MONGODB_URI in your deployment environment and redeploy.",
       }
     }
     return { error: "Unable to create account right now. Please try again." }
