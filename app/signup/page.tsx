@@ -15,10 +15,12 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
     setLoading(true)
     setError("")
     try {
+      const formData = new FormData(event.currentTarget)
       const result = await signupAction(formData)
       if (result?.error) {
         setError(result.error)
@@ -60,7 +62,7 @@ export default function SignupPage() {
 
         <Card className="border-border bg-card py-0">
           <CardContent className="p-6">
-            <form action={handleSubmit} className="flex flex-col gap-4">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               {error && (
                 <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
                   {error}
