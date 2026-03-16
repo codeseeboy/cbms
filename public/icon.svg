@@ -1,26 +1,85 @@
 <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <style>
-    @media (prefers-color-scheme: light) {
-      .background { fill: black; }
-      .foreground { fill: white; }
-    }
-    @media (prefers-color-scheme: dark) {
-      .background { fill: white; }
-      .foreground { fill: black; }
-    }
-  </style>
-  <g clip-path="url(#clip0_7960_43945)">
-    <rect class="background" width="180" height="180" rx="37" />
-    <g style="transform: scale(95%); transform-origin: center">
-      <path class="foreground"
-        d="M101.141 53H136.632C151.023 53 162.689 64.6662 162.689 79.0573V112.904H148.112V79.0573C148.112 78.7105 148.098 78.3662 148.072 78.0251L112.581 112.898C112.701 112.902 112.821 112.904 112.941 112.904H148.112V126.672H112.941C98.5504 126.672 86.5638 114.891 86.5638 100.5V66.7434H101.141V100.5C101.141 101.15 101.191 101.792 101.289 102.422L137.56 66.7816C137.255 66.7563 136.945 66.7434 136.632 66.7434H101.141V53Z" />
-      <path class="foreground"
-        d="M65.2926 124.136L14 66.7372H34.6355L64.7495 100.436V66.7372H80.1365V118.47C80.1365 126.278 70.4953 129.958 65.2926 124.136Z" />
-    </g>
-  </g>
   <defs>
-    <clipPath id="clip0_7960_43945">
-      <rect width="180" height="180" fill="white" />
+    <linearGradient id="bgGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#020817" />
+      <stop offset="1" stop-color="#0F172A" />
+    </linearGradient>
+    <linearGradient id="rocketBody" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4F46E5" />
+      <stop offset="1" stop-color="#22C55E" />
+    </linearGradient>
+    <linearGradient id="rocketFlame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F97316" />
+      <stop offset="1" stop-color="#FACC15" />
+    </linearGradient>
+    <clipPath id="clip">
+      <rect width="180" height="180" rx="40" />
     </clipPath>
   </defs>
+
+  <g clip-path="url(#clip)">
+    <!-- Background -->
+    <rect width="180" height="180" rx="40" fill="url(#bgGradient)" />
+
+    <!-- Subtle grid / glow circle -->
+    <circle cx="90" cy="90" r="70" fill="#0B1120" opacity="0.6" />
+    <circle cx="90" cy="90" r="54" fill="#020617" opacity="0.8" />
+
+    <!-- Rocket body -->
+    <g transform="translate(90 90) rotate(-35) translate(-90 -90)">
+      <!-- Main body -->
+      <path
+        d="M90 38C80 52 72 70 72 88C72 110 81 124 90 136C99 124 108 110 108 88C108 70 100 52 90 38Z"
+        fill="url(#rocketBody)"
+      />
+
+      <!-- Window -->
+      <circle cx="90" cy="86" r="9" fill="#0F172A" />
+      <circle cx="90" cy="86" r="5" fill="#E0F2FE" />
+
+      <!-- Nose highlight -->
+      <path
+        d="M90 38C84 47 79 58 77 69"
+        stroke="#A5B4FC"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        opacity="0.7"
+      />
+
+      <!-- Fins -->
+      <path
+        d="M72 102C64 106 58 115 56 124C66 121 75 116 81 110"
+        fill="#0F172A"
+        stroke="#1E293B"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <path
+        d="M108 102C116 106 122 115 124 124C114 121 105 116 99 110"
+        fill="#0F172A"
+        stroke="#1E293B"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+
+      <!-- Flame -->
+      <path
+        d="M90 136C86 144 84 152 86 160C90 156 93 153 96 149C98 145 99 140 90 136Z"
+        fill="url(#rocketFlame)"
+      />
+
+      <!-- Exhaust glow -->
+      <ellipse cx="90" cy="148" rx="10" ry="4" fill="#F97316" opacity="0.35" />
+    </g>
+
+    <!-- Stars -->
+    <circle cx="36" cy="48" r="2" fill="#FACC15" />
+    <circle cx="52" cy="32" r="1.7" fill="#E5E7EB" />
+    <circle cx="132" cy="44" r="1.6" fill="#E5E7EB" />
+    <circle cx="138" cy="70" r="1.4" fill="#FACC15" />
+    <circle cx="48" cy="116" r="1.6" fill="#FACC15" />
+    <circle cx="130" cy="126" r="1.8" fill="#E5E7EB" />
+  </g>
 </svg>

@@ -6,7 +6,11 @@ const memoryStore = new Map<string, unknown[]>()
 
 function ensureDir() {
   if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true })
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true })
+    } catch {
+      // Read-only filesystem (e.g. Vercel prod) – fall back to in-memory only.
+    }
   }
 }
 
