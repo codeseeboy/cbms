@@ -7,7 +7,7 @@ import { getCurrentUser } from "../auth"
 import type { Job, JobBookmark, JobApplication, AppliedJob } from "../types"
 
 export async function getJobs(search?: string) {
-  const jobs = findMany<Job>("jobs")
+  const jobs = await findMany<Job>("jobs")
   if (!search) return jobs
   const q = search.toLowerCase()
   return jobs.filter(
@@ -19,28 +19,28 @@ export async function getJobs(search?: string) {
 }
 
 export async function getJob(id: string) {
-  return findOne<Job>("jobs", (j) => j.id === id) || null
+  return (await findOne<Job>("jobs", (j) => j.id === id)) || null
 }
 
 export async function getBookmarks() {
   const user = await getCurrentUser()
   if (!user) return []
-  return findMany<JobBookmark>("job_bookmarks", (b) => b.userId === user.id)
+  return await findMany<JobBookmark>("job_bookmarks", (b) => b.userId === user.id)
 }
 
 export async function toggleBookmark(jobId: string) {
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const existing = findOne<JobBookmark>(
+  const existing = await findOne<JobBookmark>(
     "job_bookmarks",
     (b) => b.userId === user.id && b.jobId === jobId
   )
 
   if (existing) {
-    deleteOne("job_bookmarks", existing.id)
+    await deleteOne("job_bookmarks", existing.id)
   } else {
-    insertOne("job_bookmarks", {
+    await insertOne("job_bookmarks", {
       id: uuid(),
       userId: user.id,
       jobId,
@@ -56,13 +56,13 @@ export async function applyToJob(jobId: string) {
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const existing = findOne<JobApplication>(
+  const existing = await findOne<JobApplication>(
     "job_applications",
     (a) => a.userId === user.id && a.jobId === jobId
   )
   if (existing) return { error: "Already applied to this job" }
 
-  insertOne("job_applications", {
+  await insertOne("job_applications", {
     id: uuid(),
     userId: user.id,
     jobId,
@@ -77,13 +77,13 @@ export async function applyToJob(jobId: string) {
 export async function getApplications() {
   const user = await getCurrentUser()
   if (!user) return []
-  return findMany<JobApplication>("job_applications", (a) => a.userId === user.id)
+  return await findMany<JobApplication>("job_applications", (a) => a.userId === user.id)
 }
 
 export async function getAppliedJobs() {
   const user = await getCurrentUser()
   if (!user) return []
-  return findMany<AppliedJob>("applied_jobs", (a) => a.userId === user.id)
+  return await findMany<AppliedJob>("applied_jobs", (a) => a.userId === user.id)
 }
 
 export async function saveAppliedJob(data: {
@@ -106,7 +106,7 @@ export async function saveAppliedJob(data: {
     updatedAt: new Date().toISOString(),
   }
 
-  insertOne("applied_jobs", job)
+  await insertOne("applied_jobs", job)
   revalidatePath("/dashboard/jobs")
   return { success: true, id: job.id }
 }
@@ -115,10 +115,10 @@ export async function updateAppliedJobStatus(id: string, status: AppliedJob["sta
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const existing = findOne<AppliedJob>("applied_jobs", (a) => a.id === id && a.userId === user.id)
+  const existing = await findOne<AppliedJob>("applied_jobs", (a) => a.id === id && a.userId === user.id)
   if (!existing) return { error: "Job not found" }
 
-  updateOne("applied_jobs", id, { status, updatedAt: new Date().toISOString() })
+  await updateOne("applied_jobs", id, { status, updatedAt: new Date().toISOString() })
   revalidatePath("/dashboard/jobs")
   return { success: true }
 }
@@ -127,10 +127,10 @@ export async function deleteAppliedJob(id: string) {
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const existing = findOne<AppliedJob>("applied_jobs", (a) => a.id === id && a.userId === user.id)
+  const existing = await findOne<AppliedJob>("applied_jobs", (a) => a.id === id && a.userId === user.id)
   if (!existing) return { error: "Job not found" }
 
-  deleteOne("applied_jobs", id)
+  await deleteOne("applied_jobs", id)
   revalidatePath("/dashboard/jobs")
   return { success: true }
 }

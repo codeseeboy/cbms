@@ -10,91 +10,127 @@ import type { User } from "../types"
 
 let seeded = false
 
-function ensureSeeded() {
+async function ensureSeeded() {
   if (seeded) return
-  const users = readCollection<User>("users")
+  const users = await readCollection<User>("users")
   if (users.length === 0) {
-    seedDatabase()
+    await seedDatabase()
   }
   seeded = true
 }
 
 export async function loginAction(formData: FormData) {
-  ensureSeeded()
-  const email = formData.get("email") as string
-  const password = formData.get("password") as string
+  try {
+    // Prevent stale sessions from making failed logins appear successful.
+    await clearSessionCookie()
+    await ensureSeeded()
+    const email = ((formData.get("email") as string) || "").trim().toLowerCase()
+    const password = formData.get("password") as string
 
-  if (!email || !password) {
-    return { error: "Email and password are required" }
+    if (!email || !password) {
+      return { error: "Email and password are required" }
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return { error: "Invalid email format" }
+    }
+
+    const user = await findOne<User>("users", (u) => u.email === email)
+    if (!user) {
+      await clearSessionCookie()
+      return { error: "Invalid email or password" }
+    }
+
+    if (!compareSync(password, user.password)) {
+      await clearSessionCookie()
+      return { error: "Invalid email or password" }
+    }
+
+    await setSessionCookie(user.id)
+    return { success: true }
+  } catch (error) {
+    const message = String(error)
+    if (
+      message.includes("MONGODB_URI") ||
+      message.includes("Mongo") ||
+      message.includes("ECONN") ||
+      message.includes("authentication failed")
+    ) {
+      return {
+        error:
+          "Database connection failed. Set a valid MONGODB_URI in your .env and restart the dev server.",
+      }
+    }
+    return { error: "Unable to login right now. Please try again." }
   }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(email)) {
-    return { error: "Invalid email format" }
-  }
-
-  const user = findOne<User>("users", (u) => u.email === email)
-  if (!user) {
-    return { error: "Invalid email or password" }
-  }
-
-  if (!compareSync(password, user.password)) {
-    return { error: "Invalid email or password" }
-  }
-
-  await setSessionCookie(user.id)
-  return { success: true }
 }
 
 export async function signupAction(formData: FormData) {
-  ensureSeeded()
-  const name = formData.get("name") as string
-  const email = formData.get("email") as string
-  const password = formData.get("password") as string
-  const role = (formData.get("role") as string) || "jobseeker"
+  try {
+    await ensureSeeded()
+    const name = formData.get("name") as string
+    const email = ((formData.get("email") as string) || "").trim().toLowerCase()
+    const password = formData.get("password") as string
+    const role = (formData.get("role") as string) || "jobseeker"
 
-  if (!name || !email || !password) {
-    return { error: "All fields are required" }
+    if (!name || !email || !password) {
+      return { error: "All fields are required" }
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return { error: "Invalid email format" }
+    }
+
+    if (password.length < 6) {
+      return { error: "Password must be at least 6 characters" }
+    }
+
+    const existing = await findOne<User>("users", (u) => u.email === email)
+    if (existing) {
+      return { error: "An account with this email already exists" }
+    }
+
+    const user: User = {
+      id: uuid(),
+      name,
+      email,
+      password: hashSync(password, 10),
+      role: role as User["role"],
+      phone: "",
+      location: "",
+      title: "",
+      bio: "",
+      skills: [],
+      avatar: name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    await insertOne("users", user)
+    await setSessionCookie(user.id)
+    return { success: true }
+  } catch (error) {
+    const message = String(error)
+    if (
+      message.includes("MONGODB_URI") ||
+      message.includes("Mongo") ||
+      message.includes("ECONN") ||
+      message.includes("authentication failed")
+    ) {
+      return {
+        error:
+          "Database connection failed. Set a valid MONGODB_URI in your .env and restart the dev server.",
+      }
+    }
+    return { error: "Unable to create account right now. Please try again." }
   }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(email)) {
-    return { error: "Invalid email format" }
-  }
-
-  if (password.length < 6) {
-    return { error: "Password must be at least 6 characters" }
-  }
-
-  const existing = findOne<User>("users", (u) => u.email === email)
-  if (existing) {
-    return { error: "An account with this email already exists" }
-  }
-
-  const user: User = {
-    id: uuid(),
-    name,
-    email,
-    password: hashSync(password, 10),
-    role: role as User["role"],
-    phone: "",
-    location: "",
-    title: "",
-    bio: "",
-    skills: [],
-    avatar: name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }
-
-  insertOne("users", user)
-  await setSessionCookie(user.id)
-  return { success: true }
 }
 
 export async function logoutAction() {
@@ -123,7 +159,7 @@ export async function updateProfileAction(formData: FormData) {
       .filter(Boolean)
   }
 
-  updateOne("users", user.id, updates)
+  await updateOne("users", user.id, updates)
   return { success: true }
 }
 
@@ -134,7 +170,7 @@ export async function changePasswordAction(formData: FormData) {
   const currentPassword = formData.get("currentPassword") as string
   const newPassword = formData.get("newPassword") as string
 
-  const user = findOne<User>("users", (u) => u.id === currentUser.id)
+  const user = await findOne<User>("users", (u) => u.id === currentUser.id)
   if (!user) return { error: "User not found" }
 
   if (!compareSync(currentPassword, user.password)) {
@@ -145,7 +181,7 @@ export async function changePasswordAction(formData: FormData) {
     return { error: "New password must be at least 6 characters" }
   }
 
-  updateOne<User>("users", user.id, {
+  await updateOne<User>("users", user.id, {
     password: hashSync(newPassword, 10),
     updatedAt: new Date().toISOString(),
   })

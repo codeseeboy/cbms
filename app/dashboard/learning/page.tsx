@@ -32,6 +32,7 @@ export default function LearningPage() {
   const [online, setOnline] = useState(false)
   const [downloadingCert, setDownloadingCert] = useState(false)
   const [showCerts, setShowCerts] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => { loadData(); checkServer() }, [])
 
@@ -40,10 +41,18 @@ export default function LearningPage() {
   }
 
   async function loadData() {
-    const [c, uc, certs] = await Promise.all([getCourses(), getUserCourses(), getCertificates()])
-    setCourses(c)
-    setUserCourses(uc)
-    setCertificates(certs)
+    try {
+      const [c, uc, certs] = await Promise.all([getCourses(), getUserCourses(), getCertificates()])
+      setCourses(c)
+      setUserCourses(uc)
+      setCertificates(certs)
+    } catch {
+      setCourses([])
+      setUserCourses([])
+      setCertificates([])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   function getUserCourse(courseId: string): UserCourse | undefined {
@@ -492,7 +501,33 @@ export default function LearningPage() {
 
       {/* Course Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {filtered.map((course) => {
+        {isLoading && Array.from({ length: 8 }).map((_, idx) => (
+          <Card key={`loading-${idx}`} className="border-border py-0 overflow-hidden">
+            <CardContent className="p-0">
+              <div className="h-36 bg-secondary animate-pulse" />
+              <div className="p-4 space-y-2">
+                <div className="h-4 w-3/4 bg-secondary rounded animate-pulse" />
+                <div className="h-3 w-1/2 bg-secondary rounded animate-pulse" />
+                <div className="h-3 w-2/3 bg-secondary rounded animate-pulse" />
+                <div className="h-8 w-full bg-secondary rounded animate-pulse mt-3" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+
+        {!isLoading && filtered.length === 0 && (
+          <Card className="border-border py-0 sm:col-span-2 lg:col-span-3 xl:col-span-4">
+            <CardContent className="p-8 text-center">
+              <BookOpen className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+              <h3 className="text-sm font-semibold">No courses found</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Try another category or search term.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {!isLoading && filtered.map((course) => {
           const uc = getUserCourse(course.id)
           const status = uc?.status
           const progress = uc?.progress || 0

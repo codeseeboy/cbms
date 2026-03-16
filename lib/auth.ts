@@ -55,7 +55,7 @@ export async function getSession(): Promise<{ userId: string } | null> {
 export async function getCurrentUser(): Promise<SafeUser | null> {
   const session = await getSession()
   if (!session) return null
-  const user = findOne<User>("users", (u) => u.id === session.userId)
+  const user = await findOne<User>("users", (u) => u.id === session.userId)
   if (!user) return null
   const { password: _, ...safeUser } = user
   return safeUser

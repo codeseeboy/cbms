@@ -17,13 +17,13 @@ export async function getAdminData() {
   const user = await getCurrentUser()
   if (!user || user.role !== "admin") return null
 
-  const users = findMany<User>("users")
-  const resumes = findMany<Resume>("resumes")
-  const jobs = findMany<Job>("jobs")
-  const assessments = findMany<UserAssessment>("user_assessments")
-  const courses = findMany<UserCourse>("user_courses")
-  const applications = findMany<JobApplication>("job_applications")
-  const notifications = findMany<Notification>("notifications")
+  const users = await findMany<User>("users")
+  const resumes = await findMany<Resume>("resumes")
+  const jobs = await findMany<Job>("jobs")
+  const assessments = await findMany<UserAssessment>("user_assessments")
+  const courses = await findMany<UserCourse>("user_courses")
+  const applications = await findMany<JobApplication>("job_applications")
+  const notifications = await findMany<Notification>("notifications")
 
   const safeUsers = users.map(({ password: _, ...u }) => u)
 
@@ -53,7 +53,7 @@ export async function updateUserRole(userId: string, role: string) {
   const admin = await getCurrentUser()
   if (!admin || admin.role !== "admin") return { error: "Not authorized" }
 
-  updateOne<User>("users", userId, {
+  await updateOne<User>("users", userId, {
     role: role as User["role"],
     updatedAt: new Date().toISOString(),
   })
@@ -66,7 +66,7 @@ export async function deleteUser(userId: string) {
   if (!admin || admin.role !== "admin") return { error: "Not authorized" }
   if (userId === admin.id) return { error: "Cannot delete your own account" }
 
-  deleteOne("users", userId)
+  await deleteOne("users", userId)
   revalidatePath("/dashboard/admin")
   return { success: true }
 }

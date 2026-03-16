@@ -7,7 +7,7 @@ import { getCurrentUser } from "../auth"
 import type { Course, UserCourse, Certificate } from "../types"
 
 export async function getCourses(search?: string, category?: string) {
-  let courses = findMany<Course>("courses")
+  let courses = await findMany<Course>("courses")
   if (search) {
     const q = search.toLowerCase()
     courses = courses.filter(
@@ -23,32 +23,37 @@ export async function getCourses(search?: string, category?: string) {
 }
 
 export async function getCourse(id: string) {
-  return findOne<Course>("courses", (c) => c.id === id) || null
+  return (await findOne<Course>("courses", (c) => c.id === id)) || null
 }
 
 export async function getUserCourses() {
   const user = await getCurrentUser()
   if (!user) return []
-  return findMany<UserCourse>("user_courses", (uc) => uc.userId === user.id)
+  return await findMany<UserCourse>("user_courses", (uc) => uc.userId === user.id)
 }
 
 export async function getUserCourse(courseId: string) {
   const user = await getCurrentUser()
   if (!user) return null
-  return findOne<UserCourse>("user_courses", (uc) => uc.userId === user.id && uc.courseId === courseId) || null
+  return (
+    (await findOne<UserCourse>(
+      "user_courses",
+      (uc) => uc.userId === user.id && uc.courseId === courseId
+    )) || null
+  )
 }
 
 export async function enrollCourse(courseId: string) {
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const existing = findOne<UserCourse>(
+  const existing = await findOne<UserCourse>(
     "user_courses",
     (uc) => uc.userId === user.id && uc.courseId === courseId
   )
   if (existing) return { error: "Already enrolled", id: existing.id }
 
-  const course = findOne<Course>("courses", (c) => c.id === courseId)
+  const course = await findOne<Course>("courses", (c) => c.id === courseId)
   const firstVideoId = course?.modules?.[0]?.videos?.[0]?.id || ""
 
   const uc: UserCourse = {
@@ -63,7 +68,7 @@ export async function enrollCourse(courseId: string) {
     completedAt: null,
   }
 
-  insertOne("user_courses", uc)
+  await insertOne("user_courses", uc)
   revalidatePath("/dashboard/learning")
   return { success: true, id: uc.id }
 }
@@ -72,13 +77,13 @@ export async function markVideoWatched(courseId: string, videoId: string) {
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const uc = findOne<UserCourse>(
+  const uc = await findOne<UserCourse>(
     "user_courses",
     (u) => u.userId === user.id && u.courseId === courseId
   )
   if (!uc) return { error: "Not enrolled" }
 
-  const course = findOne<Course>("courses", (c) => c.id === courseId)
+  const course = await findOne<Course>("courses", (c) => c.id === courseId)
   if (!course) return { error: "Course not found" }
 
   const watched = new Set(uc.watchedVideos || [])
@@ -97,12 +102,12 @@ export async function markVideoWatched(courseId: string, videoId: string) {
     updates.completedAt = new Date().toISOString()
     updates.progress = 100
 
-    const existingCert = findOne<Certificate>(
+    const existingCert = await findOne<Certificate>(
       "certificates",
       (c) => c.userId === user.id && c.courseId === courseId
     )
     if (!existingCert) {
-      insertOne("certificates", {
+      await insertOne("certificates", {
         id: uuid(),
         userId: user.id,
         courseId,
@@ -113,7 +118,7 @@ export async function markVideoWatched(courseId: string, videoId: string) {
     }
   }
 
-  updateOne("user_courses", uc.id, updates)
+  await updateOne("user_courses", uc.id, updates)
   revalidatePath("/dashboard/learning")
   return { success: true, progress: updates.progress, completed: progress >= 100 }
 }
@@ -122,33 +127,38 @@ export async function setCurrentVideo(courseId: string, videoId: string) {
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const uc = findOne<UserCourse>(
+  const uc = await findOne<UserCourse>(
     "user_courses",
     (u) => u.userId === user.id && u.courseId === courseId
   )
   if (!uc) return { error: "Not enrolled" }
 
-  updateOne("user_courses", uc.id, { currentVideoId: videoId })
+  await updateOne("user_courses", uc.id, { currentVideoId: videoId })
   return { success: true }
 }
 
 export async function getCertificates() {
   const user = await getCurrentUser()
   if (!user) return []
-  return findMany<Certificate>("certificates", (c) => c.userId === user.id)
+  return await findMany<Certificate>("certificates", (c) => c.userId === user.id)
 }
 
 export async function getCertificate(courseId: string) {
   const user = await getCurrentUser()
   if (!user) return null
-  return findOne<Certificate>("certificates", (c) => c.userId === user.id && c.courseId === courseId) || null
+  return (
+    (await findOne<Certificate>(
+      "certificates",
+      (c) => c.userId === user.id && c.courseId === courseId
+    )) || null
+  )
 }
 
 export async function updateCourseProgress(courseId: string, progress: number) {
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const uc = findOne<UserCourse>(
+  const uc = await findOne<UserCourse>(
     "user_courses",
     (u) => u.userId === user.id && u.courseId === courseId
   )
@@ -161,7 +171,7 @@ export async function updateCourseProgress(courseId: string, progress: number) {
     updates.progress = 100
   }
 
-  updateOne("user_courses", uc.id, updates)
+  await updateOne("user_courses", uc.id, updates)
   revalidatePath("/dashboard/learning")
   return { success: true }
 }

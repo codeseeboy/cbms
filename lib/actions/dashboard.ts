@@ -16,28 +16,29 @@ export async function getDashboardData() {
   const user = await getCurrentUser()
   if (!user) return null
 
-  const resumes = findMany<Resume>("resumes", (r) => r.userId === user.id)
-  const jobs = findMany<Job>("jobs")
-  const userAssessments = findMany<UserAssessment>(
+  const resumes = await findMany<Resume>("resumes", (r) => r.userId === user.id)
+  const jobs = await findMany<Job>("jobs")
+  const userAssessments = await findMany<UserAssessment>(
     "user_assessments",
     (ua) => ua.userId === user.id
   )
-  const userCourses = findMany<UserCourse>(
+  const userCourses = await findMany<UserCourse>(
     "user_courses",
     (uc) => uc.userId === user.id
   )
-  const activities = findMany<ActivityLog>(
+  const activities = (await findMany<ActivityLog>(
     "activity_log",
     (a) => a.userId === user.id
-  ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  const notifications = findMany<Notification>(
+  )).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const notifications = await findMany<Notification>(
     "notifications",
     (n) => n.userId === user.id && !n.read
   )
-  const applications = findMany<JobApplication>(
+  const applications = await findMany<JobApplication>(
     "job_applications",
     (a) => a.userId === user.id
   )
+  const assessments = await findMany<any>("assessments")
 
   const completedAssessments = userAssessments.filter((ua) => ua.status === "completed")
   const avgScore =
@@ -67,9 +68,7 @@ export async function getDashboardData() {
     unreadNotifications: notifications.length,
     skillProgress: user.skills.map((skill) => {
       const related = completedAssessments.find((ua) => {
-        const assessment = findMany<any>("assessments").find(
-          (a: any) => a.id === ua.assessmentId
-        )
+        const assessment = assessments.find((a: any) => a.id === ua.assessmentId)
         return assessment?.title?.toLowerCase().includes(skill.toLowerCase())
       })
       return {

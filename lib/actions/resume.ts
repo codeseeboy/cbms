@@ -9,13 +9,13 @@ import type { Resume } from "../types"
 export async function getResumes() {
   const user = await getCurrentUser()
   if (!user) return []
-  return findMany<Resume>("resumes", (r) => r.userId === user.id)
+  return await findMany<Resume>("resumes", (r) => r.userId === user.id)
 }
 
 export async function getResume(id: string) {
   const user = await getCurrentUser()
   if (!user) return null
-  return findOne<Resume>("resumes", (r) => r.id === id && r.userId === user.id) || null
+  return (await findOne<Resume>("resumes", (r) => r.id === id && r.userId === user.id)) || null
 }
 
 export async function createResume(formData: FormData) {
@@ -55,7 +55,7 @@ export async function createResume(formData: FormData) {
     updatedAt: new Date().toISOString(),
   }
 
-  insertOne("resumes", resume)
+  await insertOne("resumes", resume)
   revalidatePath("/dashboard/resume")
   return { success: true, id: resume.id }
 }
@@ -83,7 +83,7 @@ export async function updateResume(id: string, formData: FormData) {
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const existing = findOne<Resume>("resumes", (r) => r.id === id && r.userId === user.id)
+  const existing = await findOne<Resume>("resumes", (r) => r.id === id && r.userId === user.id)
   if (!existing) return { error: "Resume not found" }
 
   const updates: Partial<Resume> = {
@@ -119,7 +119,7 @@ export async function updateResume(id: string, formData: FormData) {
   const merged = { ...existing, ...updates }
   updates.completeness = calculateCompleteness(merged as Resume)
 
-  updateOne("resumes", id, updates)
+  await updateOne("resumes", id, updates)
   revalidatePath("/dashboard/resume")
   return { success: true }
 }
@@ -128,10 +128,10 @@ export async function deleteResume(id: string) {
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const existing = findOne<Resume>("resumes", (r) => r.id === id && r.userId === user.id)
+  const existing = await findOne<Resume>("resumes", (r) => r.id === id && r.userId === user.id)
   if (!existing) return { error: "Resume not found" }
 
-  deleteOne("resumes", id)
+  await deleteOne("resumes", id)
   revalidatePath("/dashboard/resume")
   return { success: true }
 }

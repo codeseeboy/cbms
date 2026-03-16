@@ -7,27 +7,27 @@ import { getCurrentUser } from "../auth"
 import type { Assessment, UserAssessment } from "../types"
 
 export async function getAssessments() {
-  return findMany<Assessment>("assessments")
+  return await findMany<Assessment>("assessments")
 }
 
 export async function getAssessment(id: string) {
-  return findOne<Assessment>("assessments", (a) => a.id === id) || null
+  return (await findOne<Assessment>("assessments", (a) => a.id === id)) || null
 }
 
 export async function getUserAssessments() {
   const user = await getCurrentUser()
   if (!user) return []
-  return findMany<UserAssessment>("user_assessments", (ua) => ua.userId === user.id)
+  return await findMany<UserAssessment>("user_assessments", (ua) => ua.userId === user.id)
 }
 
 export async function getUserAssessment(assessmentId: string) {
   const user = await getCurrentUser()
   if (!user) return null
   return (
-    findOne<UserAssessment>(
+    (await findOne<UserAssessment>(
       "user_assessments",
       (ua) => ua.userId === user.id && ua.assessmentId === assessmentId
-    ) || null
+    )) || null
   )
 }
 
@@ -35,16 +35,16 @@ export async function startAssessment(assessmentId: string) {
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const assessment = findOne<Assessment>("assessments", (a) => a.id === assessmentId)
+  const assessment = await findOne<Assessment>("assessments", (a) => a.id === assessmentId)
   if (!assessment) return { error: "Assessment not found" }
 
-  const existing = findOne<UserAssessment>(
+  const existing = await findOne<UserAssessment>(
     "user_assessments",
     (ua) => ua.userId === user.id && ua.assessmentId === assessmentId
   )
 
   if (existing && existing.status === "completed") {
-    updateOne<UserAssessment>("user_assessments", existing.id, {
+    await updateOne<UserAssessment>("user_assessments", existing.id, {
       score: null,
       answers: assessment.questions.map(() => null),
       currentQuestion: 0,
@@ -72,7 +72,7 @@ export async function startAssessment(assessmentId: string) {
     completedAt: null,
   }
 
-  insertOne("user_assessments", ua)
+  await insertOne("user_assessments", ua)
   revalidatePath("/dashboard/skills")
   return { success: true, id: ua.id }
 }
@@ -81,7 +81,7 @@ export async function submitAnswer(assessmentId: string, questionIndex: number, 
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const ua = findOne<UserAssessment>(
+  const ua = await findOne<UserAssessment>(
     "user_assessments",
     (u) => u.userId === user.id && u.assessmentId === assessmentId
   )
@@ -90,7 +90,7 @@ export async function submitAnswer(assessmentId: string, questionIndex: number, 
   const newAnswers = [...ua.answers]
   newAnswers[questionIndex] = answer
 
-  updateOne<UserAssessment>("user_assessments", ua.id, {
+  await updateOne<UserAssessment>("user_assessments", ua.id, {
     answers: newAnswers,
     currentQuestion: questionIndex + 1,
   })
@@ -101,7 +101,7 @@ export async function submitAnswer(assessmentId: string, questionIndex: number, 
 export async function getAssessmentHistory() {
   const user = await getCurrentUser()
   if (!user) return []
-  const all = findMany<UserAssessment>("user_assessments", (ua) => ua.userId === user.id)
+  const all = await findMany<UserAssessment>("user_assessments", (ua) => ua.userId === user.id)
   return all
     .filter((ua) => ua.status === "completed" && ua.completedAt)
     .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
@@ -111,10 +111,10 @@ export async function completeAssessment(assessmentId: string) {
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const assessment = findOne<Assessment>("assessments", (a) => a.id === assessmentId)
+  const assessment = await findOne<Assessment>("assessments", (a) => a.id === assessmentId)
   if (!assessment) return { error: "Assessment not found" }
 
-  const ua = findOne<UserAssessment>(
+  const ua = await findOne<UserAssessment>(
     "user_assessments",
     (u) => u.userId === user.id && u.assessmentId === assessmentId
   )
@@ -126,7 +126,7 @@ export async function completeAssessment(assessmentId: string) {
   })
   const score = Math.round((correct / assessment.questions.length) * 100)
 
-  updateOne<UserAssessment>("user_assessments", ua.id, {
+  await updateOne<UserAssessment>("user_assessments", ua.id, {
     score,
     status: "completed",
     completedAt: new Date().toISOString(),

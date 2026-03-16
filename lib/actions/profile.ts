@@ -29,6 +29,6 @@ export async function updateProfile(formData: FormData) {
       .filter(Boolean)
   }
 
-  updateOne("users", user.id, updates)
+  await updateOne("users", user.id, updates)
   return { success: true }
 }

@@ -9,7 +9,7 @@ import type { CareerGoal } from "../types"
 export async function getCareerGoals() {
   const user = await getCurrentUser()
   if (!user) return []
-  return findMany<CareerGoal>("career_goals", (g) => g.userId === user.id)
+  return await findMany<CareerGoal>("career_goals", (g) => g.userId === user.id)
 }
 
 export async function createCareerGoal(formData: FormData) {
@@ -45,7 +45,7 @@ export async function createCareerGoal(formData: FormData) {
     updatedAt: new Date().toISOString(),
   }
 
-  insertOne("career_goals", goal)
+  await insertOne("career_goals", goal)
   revalidatePath("/dashboard/career")
   return { success: true }
 }
@@ -54,7 +54,7 @@ export async function toggleMilestone(goalId: string, milestoneId: string) {
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const goal = findOne<CareerGoal>(
+  const goal = await findOne<CareerGoal>(
     "career_goals",
     (g) => g.id === goalId && g.userId === user.id
   )
@@ -66,7 +66,7 @@ export async function toggleMilestone(goalId: string, milestoneId: string) {
   const doneCount = milestones.filter((m) => m.done).length
   const progress = milestones.length > 0 ? Math.round((doneCount / milestones.length) * 100) : 0
 
-  updateOne<CareerGoal>("career_goals", goalId, {
+  await updateOne<CareerGoal>("career_goals", goalId, {
     milestones,
     progress,
     status: progress >= 100 ? "completed" : "in-progress",
@@ -81,13 +81,13 @@ export async function deleteCareerGoal(goalId: string) {
   const user = await getCurrentUser()
   if (!user) return { error: "Not authenticated" }
 
-  const goal = findOne<CareerGoal>(
+  const goal = await findOne<CareerGoal>(
     "career_goals",
     (g) => g.id === goalId && g.userId === user.id
   )
   if (!goal) return { error: "Goal not found" }
 
-  deleteOne("career_goals", goalId)
+  await deleteOne("career_goals", goalId)
   revalidatePath("/dashboard/career")
   return { success: true }
 }

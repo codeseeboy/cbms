@@ -3,7 +3,7 @@ import { seedDatabase } from "@/lib/seed"
 
 export async function GET() {
   try {
-    seedDatabase()
+    await seedDatabase()
     return NextResponse.json({ success: true, message: "Database seeded successfully" })
   } catch (error) {
     return NextResponse.json(

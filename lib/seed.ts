@@ -14,7 +14,7 @@ import type {
   ActivityLog,
 } from "./types"
 
-export function seedDatabase() {
+export async function seedDatabase() {
   const userId = "user-001"
   const adminId = "admin-001"
 
@@ -1274,18 +1274,18 @@ export function seedDatabase() {
     },
   ]
 
-  writeCollection("users", users)
-  writeCollection("resumes", resumes)
-  writeCollection("jobs", jobs)
-  writeCollection("assessments", assessments)
-  writeCollection("user_assessments", userAssessments)
-  writeCollection("courses", courses)
-  writeCollection("user_courses", userCourses)
-  writeCollection("career_goals", careerGoals)
-  writeCollection("notifications", notifications)
-  writeCollection("activity_log", activityLog)
-  writeCollection("job_bookmarks", [] as any[])
-  writeCollection("job_applications", [] as any[])
-  writeCollection("applied_jobs", [] as any[])
-  writeCollection("certificates", [] as any[])
+  await writeCollection("users", users)
+  await writeCollection("resumes", resumes)
+  await writeCollection("jobs", jobs)
+  await writeCollection("assessments", assessments)
+  await writeCollection("user_assessments", userAssessments)
+  await writeCollection("courses", courses)
+  await writeCollection("user_courses", userCourses)
+  await writeCollection("career_goals", careerGoals)
+  await writeCollection("notifications", notifications)
+  await writeCollection("activity_log", activityLog)
+  await writeCollection("job_bookmarks", [] as any[])
+  await writeCollection("job_applications", [] as any[])
+  await writeCollection("applied_jobs", [] as any[])
+  await writeCollection("certificates", [] as any[])
 }
