@@ -1,55 +1,32 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { findMany, updateOne, deleteOne, readCollection, writeCollection } from "../db"
-import { getCurrentUser } from "../auth"
+import { apiGet, apiPut, apiDelete } from "../api"
 import type { Notification } from "../types"
 
 export async function getNotifications() {
-  const user = await getCurrentUser()
-  if (!user) return []
-  return (await findMany<Notification>("notifications", (n) => n.userId === user.id)).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  )
+  return (await apiGet<Notification[]>("/api/notifications")) || []
 }
 
 export async function getUnreadCount() {
-  const user = await getCurrentUser()
-  if (!user) return 0
-  const notifs = await findMany<Notification>(
-    "notifications",
-    (n) => n.userId === user.id && !n.read
-  )
-  return notifs.length
+  const result = await apiGet<{ count: number }>("/api/notifications/unread-count")
+  return result?.count || 0
 }
 
 export async function markAsRead(id: string) {
-  const user = await getCurrentUser()
-  if (!user) return { error: "Not authenticated" }
-
-  await updateOne<Notification>("notifications", id, { read: true })
+  const result = await apiPut(`/api/notifications/${id}/read`)
   revalidatePath("/dashboard/notifications")
-  return { success: true }
+  return result
 }
 
 export async function markAllAsRead() {
-  const user = await getCurrentUser()
-  if (!user) return { error: "Not authenticated" }
-
-  const all = await readCollection<Notification>("notifications")
-  const updated = all.map((n) =>
-    n.userId === user.id ? { ...n, read: true } : n
-  )
-  await writeCollection("notifications", updated)
+  const result = await apiPut("/api/notifications/read-all")
   revalidatePath("/dashboard/notifications")
-  return { success: true }
+  return result
 }
 
 export async function deleteNotification(id: string) {
-  const user = await getCurrentUser()
-  if (!user) return { error: "Not authenticated" }
-
-  await deleteOne("notifications", id)
+  const result = await apiDelete(`/api/notifications/${id}`)
   revalidatePath("/dashboard/notifications")
-  return { success: true }
+  return result
 }

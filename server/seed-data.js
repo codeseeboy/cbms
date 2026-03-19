@@ -1,0 +1,227 @@
+const { hashSync } = require("bcryptjs");
+
+function getSeedData() {
+  const userId = "user-001";
+  const adminId = "admin-001";
+
+  const users = [
+    {
+      id: userId, name: "Shashikant Rajput", email: "shashikant@careerbuilder.com",
+      password: hashSync("password123", 10), role: "jobseeker",
+      phone: "+91 98765 43210", location: "Mumbai, India", title: "Senior Frontend Developer",
+      bio: "Passionate full-stack developer with 4+ years of experience building scalable web applications. Proficient in React, TypeScript, and Node.js with a strong focus on performance and user experience.",
+      skills: ["React", "TypeScript", "Next.js", "Node.js", "Tailwind CSS", "Python"],
+      avatar: "SR", createdAt: "2026-01-15T10:00:00Z", updatedAt: "2026-03-10T10:00:00Z",
+    },
+    {
+      id: adminId, name: "Admin User", email: "admin@careerbuilder.com",
+      password: hashSync("admin123", 10), role: "admin",
+      phone: "+91 99999 00000", location: "Delhi, India", title: "System Administrator",
+      bio: "Platform administrator managing the Career Builder Management System.",
+      skills: ["System Administration", "Analytics", "User Management"],
+      avatar: "AD", createdAt: "2026-01-01T10:00:00Z", updatedAt: "2026-03-10T10:00:00Z",
+    },
+    {
+      id: "recruiter-001", name: "Priya Sharma", email: "priya@techcorp.com",
+      password: hashSync("password123", 10), role: "recruiter",
+      phone: "+91 98765 11111", location: "Bangalore, India", title: "Senior Recruiter",
+      bio: "Talent acquisition specialist at TechCorp India.",
+      skills: ["Recruitment", "Talent Acquisition", "HR"],
+      avatar: "PS", createdAt: "2026-01-20T10:00:00Z", updatedAt: "2026-03-10T10:00:00Z",
+    },
+  ];
+
+  const resumes = [
+    {
+      id: "resume-001", userId, title: "Frontend Developer", template: "modern",
+      personalInfo: { name: "Shashikant Rajput", email: "shashikant@careerbuilder.com", phone: "+91 98765 43210", location: "Mumbai, India" },
+      summary: "Passionate full-stack developer with 4+ years of experience building scalable web applications.",
+      experience: [
+        { id: "exp-001", title: "Senior Frontend Developer", company: "TechCorp India", period: "Jan 2023 - Present", description: "Led frontend architecture for enterprise SaaS platform. Improved performance by 40%." },
+        { id: "exp-002", title: "Frontend Developer", company: "StartupXYZ", period: "Jun 2021 - Dec 2022", description: "Built responsive web applications using React and TypeScript." },
+      ],
+      education: [{ id: "edu-001", degree: "B.Tech in Computer Science", school: "Mumbai University", year: "2021" }],
+      skills: ["React", "TypeScript", "Next.js", "Node.js", "Tailwind CSS"],
+      projects: [], certifications: [], languages: [], volunteering: [], awards: [], publications: [], achievements: [], hobbies: [],
+      completeness: 92, createdAt: "2026-02-01T10:00:00Z", updatedAt: "2026-03-10T10:00:00Z",
+    },
+    {
+      id: "resume-002", userId, title: "Full Stack Engineer", template: "classic",
+      personalInfo: { name: "Shashikant Rajput", email: "shashikant@careerbuilder.com", phone: "+91 98765 43210", location: "Mumbai, India" },
+      summary: "Versatile full-stack engineer with expertise in modern web technologies.",
+      experience: [{ id: "exp-003", title: "Senior Frontend Developer", company: "TechCorp India", period: "Jan 2023 - Present", description: "Full-stack development for enterprise platforms." }],
+      education: [{ id: "edu-002", degree: "B.Tech in Computer Science", school: "Mumbai University", year: "2021" }],
+      skills: ["React", "Node.js", "PostgreSQL", "AWS", "Docker"],
+      projects: [], certifications: [], languages: [], volunteering: [], awards: [], publications: [], achievements: [], hobbies: [],
+      completeness: 78, createdAt: "2026-02-15T10:00:00Z", updatedAt: "2026-03-05T10:00:00Z",
+    },
+    {
+      id: "resume-003", userId, title: "UI/UX Developer", template: "minimal",
+      personalInfo: { name: "Shashikant Rajput", email: "shashikant@careerbuilder.com", phone: "+91 98765 43210", location: "Mumbai, India" },
+      summary: "Creative UI/UX developer with a passion for beautiful, accessible interfaces.",
+      experience: [],
+      education: [{ id: "edu-003", degree: "B.Tech in Computer Science", school: "Mumbai University", year: "2021" }],
+      skills: ["Figma", "React", "CSS", "Accessibility"],
+      projects: [], certifications: [], languages: [], volunteering: [], awards: [], publications: [], achievements: [], hobbies: [],
+      completeness: 65, createdAt: "2026-03-01T10:00:00Z", updatedAt: "2026-03-01T10:00:00Z",
+    },
+  ];
+
+  const jobs = [
+    { id: "job-001", title: "Senior Frontend Developer", company: "TechCorp India", logo: "TC", location: "Remote", type: "Full-time", salary: "18-25 LPA", match: 95, posted: "2026-03-12", tags: ["React", "TypeScript", "Next.js", "Tailwind CSS"], description: "Lead frontend architecture for our enterprise SaaS platform serving 10K+ users globally.", requirements: ["5+ years React experience", "TypeScript proficiency", "System design knowledge"], benefits: ["Remote work", "Health insurance", "Stock options", "Learning budget"] },
+    { id: "job-002", title: "Full Stack Engineer", company: "StartupXYZ", logo: "SX", location: "Bangalore", type: "Full-time", salary: "15-22 LPA", match: 88, posted: "2026-03-09", tags: ["React", "Python", "AWS", "Docker"], description: "Build and scale core product features from design to deployment in a fast-paced startup.", requirements: ["3+ years full-stack experience", "React and Python", "AWS familiarity"], benefits: ["Equity", "Flexible hours", "Team lunches", "Conference budget"] },
+    { id: "job-003", title: "UI/UX Developer", company: "DesignHub", logo: "DH", location: "Hybrid - Mumbai", type: "Full-time", salary: "12-18 LPA", match: 82, posted: "2026-03-07", tags: ["Figma", "React", "CSS", "Storybook"], description: "Create beautiful, accessible UI components and design systems for enterprise clients.", requirements: ["UI/UX design skills", "React proficiency", "Accessibility knowledge"], benefits: ["Hybrid work", "Health insurance", "Creative freedom"] },
+    { id: "job-004", title: "React Native Developer", company: "MobileFirst", logo: "MF", location: "Remote", type: "Contract", salary: "20-28 LPA", match: 76, posted: "2026-03-11", tags: ["React Native", "TypeScript", "Redux", "Firebase"], description: "Develop cross-platform mobile applications for fintech products used by millions.", requirements: ["React Native experience", "TypeScript", "Mobile development"], benefits: ["Remote work", "Competitive pay", "Flexible schedule"] },
+    { id: "job-005", title: "Backend Engineer", company: "DataStream", logo: "DS", location: "Pune", type: "Full-time", salary: "16-24 LPA", match: 70, posted: "2026-03-13", tags: ["Node.js", "PostgreSQL", "Redis", "Kubernetes"], description: "Design and build scalable microservices handling high-throughput data processing.", requirements: ["Node.js expertise", "Database design", "Distributed systems"], benefits: ["Office perks", "Health insurance", "Annual bonus"] },
+    { id: "job-006", title: "DevOps Engineer", company: "CloudOps", logo: "CO", location: "Remote", type: "Full-time", salary: "18-26 LPA", match: 65, posted: "2026-03-10", tags: ["AWS", "Terraform", "Docker", "CI/CD"], description: "Automate infrastructure and deployment pipelines for cloud-native applications.", requirements: ["AWS certification preferred", "Terraform experience", "CI/CD pipelines"], benefits: ["Remote first", "Learning budget", "Health coverage"] },
+  ];
+
+  const assessments = [
+    { id: "assess-001", title: "React & Next.js", category: "Frontend", difficulty: "Advanced", duration: "30 min", questions: [
+      { id: "q1", question: "What hook is used to manage side effects in React?", options: ["useState", "useEffect", "useContext", "useReducer"], correctAnswer: 1 },
+      { id: "q2", question: "In Next.js App Router, which file defines a route layout?", options: ["page.tsx", "layout.tsx", "template.tsx", "route.tsx"], correctAnswer: 1 },
+      { id: "q3", question: "What is the purpose of React.memo()?", options: ["Manage state", "Handle side effects", "Prevent unnecessary re-renders", "Create context"], correctAnswer: 2 },
+      { id: "q4", question: "Which Next.js feature enables automatic code splitting?", options: ["getStaticProps", "Dynamic imports", "Server Components", "All of the above"], correctAnswer: 3 },
+      { id: "q5", question: "What is the virtual DOM in React?", options: ["A direct copy of the browser DOM", "A lightweight representation of the real DOM", "A CSS framework", "A testing utility"], correctAnswer: 1 },
+      { id: "q6", question: "How do you share data between Server and Client Components in Next.js?", options: ["Global state", "Props and serialization", "localStorage", "Session storage"], correctAnswer: 1 },
+      { id: "q7", question: "What is the correct way to handle forms in Next.js 14+ App Router?", options: ["onSubmit handler only", "API routes only", "Server Actions", "Redux forms"], correctAnswer: 2 },
+      { id: "q8", question: "Which React hook is used for performance optimization of expensive computations?", options: ["useEffect", "useMemo", "useCallback", "useRef"], correctAnswer: 1 },
+      { id: "q9", question: "What does 'use client' directive do in Next.js?", options: ["Makes the component render only on client", "Marks the boundary between Server and Client Components", "Enables client-side routing", "Disables SSR"], correctAnswer: 1 },
+      { id: "q10", question: "What is Suspense used for in React?", options: ["Error handling", "State management", "Showing fallback while content loads", "Animation"], correctAnswer: 2 },
+    ]},
+    { id: "assess-002", title: "TypeScript Mastery", category: "Frontend", difficulty: "Intermediate", duration: "25 min", questions: [
+      { id: "q1", question: "What is the difference between 'interface' and 'type' in TypeScript?", options: ["No difference", "Interfaces can be extended, types cannot", "Types can represent unions, interfaces cannot natively", "Interfaces are faster"], correctAnswer: 2 },
+      { id: "q2", question: "What does the 'keyof' operator return?", options: ["All values of a type", "A union of all property names of a type", "The first key of an object", "A boolean"], correctAnswer: 1 },
+      { id: "q3", question: "What is a generic type in TypeScript?", options: ["A type that works with any type", "A parameterized type that works with multiple types", "A built-in type", "A string type"], correctAnswer: 1 },
+      { id: "q4", question: "What is the 'never' type used for?", options: ["Optional values", "Functions that never return", "Null values", "Boolean values"], correctAnswer: 1 },
+      { id: "q5", question: "How do you make all properties of a type optional?", options: ["Optional<T>", "Partial<T>", "Maybe<T>", "Nullable<T>"], correctAnswer: 1 },
+      { id: "q6", question: "What is a discriminated union?", options: ["A union with a common literal property for narrowing", "A union of numbers", "An intersection type", "A mapped type"], correctAnswer: 0 },
+      { id: "q7", question: "What does 'as const' do?", options: ["Makes a variable constant", "Narrows the type to its literal value", "Creates an immutable object", "Casts to a constant type"], correctAnswer: 1 },
+      { id: "q8", question: "What utility type extracts the return type of a function?", options: ["ReturnType<T>", "FunctionReturn<T>", "ResultOf<T>", "Output<T>"], correctAnswer: 0 },
+    ]},
+    { id: "assess-003", title: "Node.js & Express", category: "Backend", difficulty: "Intermediate", duration: "30 min", questions: [
+      { id: "q1", question: "What is the event loop in Node.js?", options: ["A for loop", "A mechanism that handles async operations", "A UI component", "A database query"], correctAnswer: 1 },
+      { id: "q2", question: "What is middleware in Express?", options: ["A database", "Functions that have access to req, res, and next", "A frontend framework", "A testing tool"], correctAnswer: 1 },
+      { id: "q3", question: "How does Node.js handle concurrent requests?", options: ["Multi-threading", "Single-threaded event loop with async I/O", "Process forking for each request", "Load balancing"], correctAnswer: 1 },
+      { id: "q4", question: "What is the purpose of package.json?", options: ["Store application data", "Define project metadata and dependencies", "Configure the database", "Define UI components"], correctAnswer: 1 },
+      { id: "q5", question: "What is a stream in Node.js?", options: ["A video player", "An object for reading/writing data piece by piece", "A database connection", "A logging tool"], correctAnswer: 1 },
+      { id: "q6", question: "What HTTP method is used to update a resource partially?", options: ["GET", "POST", "PUT", "PATCH"], correctAnswer: 3 },
+      { id: "q7", question: "What is CORS?", options: ["A Node.js module", "Cross-Origin Resource Sharing mechanism", "A CSS framework", "A testing methodology"], correctAnswer: 1 },
+      { id: "q8", question: "What does 'npm audit' do?", options: ["Audits code quality", "Checks for known security vulnerabilities in dependencies", "Tests the application", "Optimizes packages"], correctAnswer: 1 },
+    ]},
+    { id: "assess-004", title: "System Design", category: "Backend", difficulty: "Advanced", duration: "45 min", questions: [
+      { id: "q1", question: "What is horizontal scaling?", options: ["Adding more power to existing machines", "Adding more machines to distribute load", "Optimizing code", "Reducing database size"], correctAnswer: 1 },
+      { id: "q2", question: "What is a load balancer?", options: ["A database optimizer", "Distributes incoming traffic across multiple servers", "A caching layer", "A CDN"], correctAnswer: 1 },
+      { id: "q3", question: "What is the CAP theorem?", options: ["A design pattern", "Consistency, Availability, Partition tolerance trade-off", "A caching strategy", "A security protocol"], correctAnswer: 1 },
+      { id: "q4", question: "What is database sharding?", options: ["Backing up data", "Splitting data across multiple databases", "Encrypting data", "Indexing data"], correctAnswer: 1 },
+      { id: "q5", question: "What is a message queue used for?", options: ["Sending emails", "Asynchronous communication between services", "User authentication", "File storage"], correctAnswer: 1 },
+      { id: "q6", question: "What is a CDN?", options: ["Central Data Node", "Content Delivery Network for serving content from edge locations", "Cloud Data Network", "Cached Data Node"], correctAnswer: 1 },
+    ]},
+    { id: "assess-005", title: "CSS & Responsive Design", category: "Frontend", difficulty: "Beginner", duration: "20 min", questions: [
+      { id: "q1", question: "What CSS property is used to create a flex container?", options: ["display: block", "display: flex", "display: grid", "display: inline"], correctAnswer: 1 },
+      { id: "q2", question: "What unit is relative to the viewport width?", options: ["px", "em", "vw", "rem"], correctAnswer: 2 },
+      { id: "q3", question: "What is the mobile-first approach?", options: ["Design desktop first", "Design for mobile screens first, then scale up", "Only support mobile", "Use mobile frameworks"], correctAnswer: 1 },
+      { id: "q4", question: "What does 'box-sizing: border-box' do?", options: ["Adds a border", "Includes padding and border in element's total width/height", "Removes margins", "Centers the element"], correctAnswer: 1 },
+      { id: "q5", question: "Which CSS property creates a grid layout?", options: ["display: flex", "display: grid", "display: table", "display: block"], correctAnswer: 1 },
+    ]},
+    { id: "assess-006", title: "Communication Skills", category: "Soft Skills", difficulty: "Beginner", duration: "15 min", questions: [
+      { id: "q1", question: "What is active listening?", options: ["Hearing words", "Fully concentrating, understanding, and responding to a speaker", "Taking notes", "Interrupting to ask questions"], correctAnswer: 1 },
+      { id: "q2", question: "What is the best way to give constructive feedback?", options: ["Focus on the person", "Be specific about behavior and its impact", "Avoid feedback altogether", "Give feedback publicly"], correctAnswer: 1 },
+      { id: "q3", question: "What is empathy in communication?", options: ["Agreeing with everyone", "Understanding and sharing another person's feelings", "Being sympathetic", "Avoiding conflict"], correctAnswer: 1 },
+      { id: "q4", question: "What percentage of communication is non-verbal?", options: ["10%", "30%", "55-93%", "100%"], correctAnswer: 2 },
+    ]},
+    { id: "assess-007", title: "Python Fundamentals", category: "Backend", difficulty: "Intermediate", duration: "30 min", questions: [
+      { id: "q1", question: "What is a Python decorator?", options: ["A design pattern", "A function that modifies another function's behavior", "A class method", "A UI element"], correctAnswer: 1 },
+      { id: "q2", question: "What is the difference between a list and a tuple?", options: ["No difference", "Lists are mutable, tuples are immutable", "Tuples are faster", "Lists can only hold strings"], correctAnswer: 1 },
+      { id: "q3", question: "What is a list comprehension?", options: ["A way to read lists", "A concise way to create lists", "A sorting algorithm", "A debugging tool"], correctAnswer: 1 },
+      { id: "q4", question: "What does 'self' refer to in a Python class?", options: ["The class itself", "The current instance of the class", "A global variable", "The parent class"], correctAnswer: 1 },
+      { id: "q5", question: "What is a generator in Python?", options: ["A file creator", "A function that yields values lazily", "A random number generator", "A class factory"], correctAnswer: 1 },
+    ]},
+    { id: "assess-008", title: "UI/UX Principles", category: "Design", difficulty: "Beginner", duration: "20 min", questions: [
+      { id: "q1", question: "What is Fitts's Law?", options: ["A color theory", "Time to reach a target depends on distance and size", "A typography rule", "A layout principle"], correctAnswer: 1 },
+      { id: "q2", question: "What is the purpose of whitespace in design?", options: ["Waste space", "Improve readability and visual hierarchy", "Fill empty areas", "Reduce content"], correctAnswer: 1 },
+      { id: "q3", question: "What is a wireframe?", options: ["A final design", "A low-fidelity sketch of a layout", "A coding framework", "A testing tool"], correctAnswer: 1 },
+      { id: "q4", question: "What is the 60-30-10 color rule?", options: ["60% primary, 30% secondary, 10% accent colors", "60 colors maximum", "Use 10 color palettes", "30% contrast ratio"], correctAnswer: 0 },
+    ]},
+  ];
+
+  const userAssessments = [
+    { id: "ua-001", userId, assessmentId: "assess-001", score: 92, answers: [1,1,2,3,1,1,2,1,1,2], currentQuestion: 10, status: "completed", startedAt: "2026-02-20T10:00:00Z", completedAt: "2026-02-20T10:28:00Z" },
+    { id: "ua-002", userId, assessmentId: "assess-002", score: 85, answers: [2,1,1,1,1,0,1,0], currentQuestion: 8, status: "completed", startedAt: "2026-02-15T10:00:00Z", completedAt: "2026-02-15T10:22:00Z" },
+    { id: "ua-003", userId, assessmentId: "assess-003", score: 78, answers: [1,1,1,1,1,3,0,1], currentQuestion: 8, status: "completed", startedAt: "2026-02-10T10:00:00Z", completedAt: "2026-02-10T10:30:00Z" },
+    { id: "ua-004", userId, assessmentId: "assess-004", score: null, answers: [1,1,1,null,null,null], currentQuestion: 3, status: "in-progress", startedAt: "2026-03-10T10:00:00Z", completedAt: null },
+  ];
+
+  const courses = [
+    { id: "course-001", title: "React JS Full Course for Beginners", instructor: "Dave Gray", thumbnail: "https://i.ytimg.com/vi/RVFAyFWO4go/hqdefault.jpg", category: "Development", duration: "9 hours", level: "Beginner", tags: ["React", "JavaScript", "Hooks", "Frontend"], description: "Full React JS tutorial for beginners.", playlistId: "PL0Zuz27SZ-6PrE9srvEn8nbhOOyxnWXfp", totalVideos: 6, modules: [
+      { id: "m001-1", title: "React Fundamentals", videos: [{ id: "v001-1", title: "React JS Full Course", youtubeId: "RVFAyFWO4go", duration: "8:52:45", order: 1 }, { id: "v001-2", title: "React useState Hook", youtubeId: "kkuq0gTGRFQ", duration: "12:30", order: 2 }, { id: "v001-3", title: "React useEffect Hook", youtubeId: "0ZJgIjIuY7U", duration: "18:45", order: 3 }] },
+      { id: "m001-2", title: "Advanced Patterns", videos: [{ id: "v001-4", title: "React useContext Hook", youtubeId: "5LrDIWkK_Bc", duration: "15:20", order: 4 }, { id: "v001-5", title: "React useRef Hook", youtubeId: "s6SLfUBRPJM", duration: "10:42", order: 5 }, { id: "v001-6", title: "React Custom Hooks", youtubeId: "djJEhMnYfTQ", duration: "14:35", order: 6 }] },
+    ]},
+    { id: "course-002", title: "Node.js and Express.js Full Course", instructor: "freeCodeCamp / John Smilga", thumbnail: "https://i.ytimg.com/vi/Oe421EPjeBE/hqdefault.jpg", category: "Development", duration: "8 hours", level: "Beginner", tags: ["Node.js", "Express", "Backend", "API"], description: "Learn Node.js and Express.js by building real-world projects.", playlistId: "PLillGF-RfqbYRpji8t4SxUkMxfowG4Kqp", totalVideos: 6, modules: [
+      { id: "m002-1", title: "Node.js Basics", videos: [{ id: "v002-1", title: "Node.js and Express.js Full Course", youtubeId: "Oe421EPjeBE", duration: "8:16:47", order: 1 }, { id: "v002-2", title: "Node.js Crash Course", youtubeId: "fBNz5xF-Kx4", duration: "1:30:00", order: 2 }, { id: "v002-3", title: "Express JS Crash Course", youtubeId: "L72fhGm1tfE", duration: "1:14:30", order: 3 }] },
+      { id: "m002-2", title: "Building APIs", videos: [{ id: "v002-4", title: "REST API Design", youtubeId: "fgTGADljAMQ", duration: "22:15", order: 4 }, { id: "v002-5", title: "JWT Authentication", youtubeId: "mbsmsi7l3r4", duration: "45:00", order: 5 }, { id: "v002-6", title: "MongoDB Crash Course", youtubeId: "-56x56UppqQ", duration: "36:12", order: 6 }] },
+    ]},
+    { id: "course-003", title: "Python for Beginners - Full Course", instructor: "Programming with Mosh", thumbnail: "https://i.ytimg.com/vi/_uQrJ0TkZlc/hqdefault.jpg", category: "Development", duration: "6 hours", level: "Beginner", tags: ["Python", "Programming", "Basics"], description: "Python tutorial for beginners.", playlistId: "PLTjRvDozrdlxj5wgH4qkvwSOdHLOCx10f", totalVideos: 6, modules: [
+      { id: "m003-1", title: "Python Fundamentals", videos: [{ id: "v003-1", title: "Python Full Course", youtubeId: "_uQrJ0TkZlc", duration: "6:14:07", order: 1 }, { id: "v003-2", title: "Python Functions", youtubeId: "u-OmVr_fT4s", duration: "21:48", order: 2 }, { id: "v003-3", title: "Python OOP", youtubeId: "JeznW_7DlB0", duration: "15:20", order: 3 }] },
+      { id: "m003-2", title: "Python Projects", videos: [{ id: "v003-4", title: "Python Automation", youtubeId: "qbW6FRbaSl0", duration: "45:31", order: 4 }, { id: "v003-5", title: "Python Data Structures", youtubeId: "pkYVOmU3MgA", duration: "12:23", order: 5 }, { id: "v003-6", title: "Python Error Handling", youtubeId: "NIWwJbo-9_8", duration: "18:07", order: 6 }] },
+    ]},
+    { id: "course-004", title: "Next.js 14 Full Course", instructor: "JavaScript Mastery", thumbnail: "https://i.ytimg.com/vi/wm5gMKuwSYk/hqdefault.jpg", category: "Development", duration: "5 hours", level: "Intermediate", tags: ["Next.js", "React", "SSR", "Full-Stack"], description: "Build and deploy a full-stack Next.js 14 application.", playlistId: "PL6QREj8te1P7gixBDSU8JLvQndTEEXE3L", totalVideos: 6, modules: [
+      { id: "m004-1", title: "Next.js Fundamentals", videos: [{ id: "v004-1", title: "Next.js 14 Full Course", youtubeId: "wm5gMKuwSYk", duration: "5:27:00", order: 1 }, { id: "v004-2", title: "Next.js App Router", youtubeId: "DrxiNfbr63s", duration: "16:41", order: 2 }, { id: "v004-3", title: "Server Components", youtubeId: "VIwWgV3Lc6s", duration: "12:15", order: 3 }] },
+      { id: "m004-2", title: "Full-Stack Next.js", videos: [{ id: "v004-4", title: "Next.js API Routes", youtubeId: "aZkG-mJZTRQ", duration: "20:30", order: 4 }, { id: "v004-5", title: "Authentication", youtubeId: "DJvM2lSPn6w", duration: "35:10", order: 5 }, { id: "v004-6", title: "Deploying to Vercel", youtubeId: "2HBIzEx6IZA", duration: "10:42", order: 6 }] },
+    ]},
+    { id: "course-005", title: "TypeScript Full Course for Beginners", instructor: "Dave Gray", thumbnail: "https://i.ytimg.com/vi/gieEQFIfgYc/hqdefault.jpg", category: "Development", duration: "8 hours", level: "Intermediate", tags: ["TypeScript", "JavaScript", "Types", "Generics"], description: "Complete TypeScript tutorial.", playlistId: "PL0Zuz27SZ-6NS8GXt5nPrcYpust89zq_b", totalVideos: 6, modules: [
+      { id: "m005-1", title: "TypeScript Basics", videos: [{ id: "v005-1", title: "TypeScript Full Course", youtubeId: "gieEQFIfgYc", duration: "8:04:28", order: 1 }, { id: "v005-2", title: "Interfaces vs Types", youtubeId: "crjIq7LEAYw", duration: "8:35", order: 2 }, { id: "v005-3", title: "Generics", youtubeId: "nViEqpgwxHE", duration: "20:10", order: 3 }] },
+      { id: "m005-2", title: "Advanced TypeScript", videos: [{ id: "v005-4", title: "Utility Types", youtubeId: "jRui-hOkces", duration: "14:25", order: 4 }, { id: "v005-5", title: "TypeScript with React", youtubeId: "TPACABQTHvM", duration: "42:30", order: 5 }, { id: "v005-6", title: "Project Setup", youtubeId: "d56mG7DezGs", duration: "12:15", order: 6 }] },
+    ]},
+    { id: "course-006", title: "Git and GitHub for Beginners", instructor: "freeCodeCamp / Gwen Faraday", thumbnail: "https://i.ytimg.com/vi/RGOj5yH7evk/hqdefault.jpg", category: "DevOps", duration: "1 hour", level: "Beginner", tags: ["Git", "GitHub", "Version Control"], description: "Learn Git and GitHub from scratch.", playlistId: "PLWKjhJtqVAbkFiqHnNaxpOPhh9tSWMXIF", totalVideos: 5, modules: [
+      { id: "m006-1", title: "Git Basics", videos: [{ id: "v006-1", title: "Git and GitHub for Beginners", youtubeId: "RGOj5yH7evk", duration: "1:08:29", order: 1 }, { id: "v006-2", title: "Git Branching", youtubeId: "e2IbNHi4uCI", duration: "11:34", order: 2 }, { id: "v006-3", title: "Merge vs Rebase", youtubeId: "CRlGDDprdOQ", duration: "8:45", order: 3 }] },
+      { id: "m006-2", title: "GitHub Workflows", videos: [{ id: "v006-4", title: "Pull Requests", youtubeId: "rgbCcBNZcdQ", duration: "12:00", order: 4 }, { id: "v006-5", title: "GitHub Actions CI/CD", youtubeId: "R8_veQiYBjI", duration: "32:32", order: 5 }] },
+    ]},
+    { id: "course-007", title: "Docker for Beginners Full Course", instructor: "TechWorld with Nana", thumbnail: "https://i.ytimg.com/vi/3c-iBn73dDE/hqdefault.jpg", category: "DevOps", duration: "3 hours", level: "Beginner", tags: ["Docker", "Containers", "DevOps"], description: "Learn Docker from scratch.", playlistId: "PLy7NrYWoggjzfAHlUusx2wuDwfCrmJYcs", totalVideos: 5, modules: [
+      { id: "m007-1", title: "Docker Fundamentals", videos: [{ id: "v007-1", title: "Docker Tutorial", youtubeId: "3c-iBn73dDE", duration: "2:46:14", order: 1 }, { id: "v007-2", title: "Dockerfile", youtubeId: "WmcdMiyqfZs", duration: "13:46", order: 2 }, { id: "v007-3", title: "Docker Compose", youtubeId: "MVIcrmeV_6c", duration: "8:20", order: 3 }] },
+      { id: "m007-2", title: "Docker in Practice", videos: [{ id: "v007-4", title: "Docker Networking", youtubeId: "bKFMS5C4CG0", duration: "18:45", order: 4 }, { id: "v007-5", title: "Docker Volumes", youtubeId: "p2PH_YPCsis", duration: "11:30", order: 5 }] },
+    ]},
+    { id: "course-008", title: "CSS Flexbox & Grid - Complete Guide", instructor: "Traversy Media", thumbnail: "https://i.ytimg.com/vi/3YW65K6LcIA/hqdefault.jpg", category: "Design", duration: "2 hours", level: "Beginner", tags: ["CSS", "Flexbox", "Grid", "Responsive"], description: "Master CSS Flexbox and Grid layout.", playlistId: "PL4cUxeGkcC9i3FXJSUfmsNOx8E7u6UuhG", totalVideos: 5, modules: [
+      { id: "m008-1", title: "CSS Flexbox", videos: [{ id: "v008-1", title: "CSS Flexbox in 20 Minutes", youtubeId: "JJSoEo8JSnc", duration: "20:08", order: 1 }, { id: "v008-2", title: "Flexbox Crash Course", youtubeId: "3YW65K6LcIA", duration: "20:00", order: 2 }] },
+      { id: "m008-2", title: "CSS Grid", videos: [{ id: "v008-3", title: "CSS Grid Crash Course", youtubeId: "jV8B24rSN5o", duration: "27:56", order: 3 }, { id: "v008-4", title: "5 Responsive Layouts", youtubeId: "p0bGHP-PXD4", duration: "38:00", order: 4 }, { id: "v008-5", title: "Responsive Design", youtubeId: "srvUrASNj0s", duration: "24:16", order: 5 }] },
+    ]},
+    { id: "course-009", title: "MongoDB Complete Course", instructor: "Net Ninja", thumbnail: "https://i.ytimg.com/vi/ExcRbA7fy_A/hqdefault.jpg", category: "Development", duration: "2 hours", level: "Intermediate", tags: ["MongoDB", "NoSQL", "Database"], description: "Learn MongoDB from beginner to advanced.", playlistId: "PL4cUxeGkcC9h77dJ-QJlwGlZlTd4ecZOA", totalVideos: 5, modules: [
+      { id: "m009-1", title: "MongoDB Basics", videos: [{ id: "v009-1", title: "MongoDB in 100 Seconds", youtubeId: "ExcRbA7fy_A", duration: "2:35", order: 1 }, { id: "v009-2", title: "MongoDB Crash Course", youtubeId: "-56x56UppqQ", duration: "36:45", order: 2 }, { id: "v009-3", title: "Mongoose Tutorial", youtubeId: "DZBGEVgL2eE", duration: "36:22", order: 3 }] },
+      { id: "m009-2", title: "Advanced MongoDB", videos: [{ id: "v009-4", title: "MongoDB Aggregation", youtubeId: "A3jvoE0jGdE", duration: "24:00", order: 4 }, { id: "v009-5", title: "MongoDB with Node.js", youtubeId: "fbYExfeFsI0", duration: "15:30", order: 5 }] },
+    ]},
+    { id: "course-010", title: "Data Structures & Algorithms in JavaScript", instructor: "freeCodeCamp / Beau Carnes", thumbnail: "https://i.ytimg.com/vi/t2CEgPsws3U/hqdefault.jpg", category: "Development", duration: "8 hours", level: "Advanced", tags: ["DSA", "Algorithms", "JavaScript", "Interview"], description: "Learn data structures and algorithms using JavaScript.", playlistId: "PLWKjhJtqVAbleDe3_ZA8h3AO2rXar-q2V", totalVideos: 6, modules: [
+      { id: "m010-1", title: "Data Structures", videos: [{ id: "v010-1", title: "Data Structures Easy to Advanced", youtubeId: "t2CEgPsws3U", duration: "2:52:00", order: 1 }, { id: "v010-2", title: "Linked Lists", youtubeId: "Hj_rA0dhr2I", duration: "18:32", order: 2 }, { id: "v010-3", title: "Binary Trees", youtubeId: "fAAZixBzIAI", duration: "22:14", order: 3 }] },
+      { id: "m010-2", title: "Algorithms & Interview Prep", videos: [{ id: "v010-4", title: "Sorting Algorithms", youtubeId: "pqivnzmSbq4", duration: "15:40", order: 4 }, { id: "v010-5", title: "Graph Algorithms", youtubeId: "tWVWeAqZ0WU", duration: "45:00", order: 5 }, { id: "v010-6", title: "Top Interview Patterns", youtubeId: "xo7XrRVxH8Y", duration: "32:00", order: 6 }] },
+    ]},
+  ];
+
+  const userCourses = [
+    { id: "uc-001", userId, courseId: "course-001", progress: 50, watchedVideos: ["v001-1", "v001-2", "v001-3"], currentVideoId: "v001-4", status: "in-progress", startedAt: "2026-02-20T10:00:00Z", completedAt: null },
+    { id: "uc-002", userId, courseId: "course-006", progress: 40, watchedVideos: ["v006-1", "v006-2"], currentVideoId: "v006-3", status: "in-progress", startedAt: "2026-03-01T10:00:00Z", completedAt: null },
+  ];
+
+  const careerGoals = [
+    { id: "goal-001", userId, title: "Become a Senior Frontend Architect", description: "Transition from developer to architect role.", deadline: "2026-12-31", progress: 65, status: "in-progress", milestones: [{ id: "m1", text: "Master React & Next.js", done: true }, { id: "m2", text: "Learn System Design patterns", done: true }, { id: "m3", text: "Lead a major project", done: true }, { id: "m4", text: "Mentor junior developers", done: false }, { id: "m5", text: "Get cloud certification", done: false }, { id: "m6", text: "Build personal brand", done: false }], createdAt: "2026-01-15T10:00:00Z", updatedAt: "2026-03-10T10:00:00Z" },
+    { id: "goal-002", userId, title: "Transition to Full-Stack Development", description: "Expand backend skills to become a full-stack engineer.", deadline: "2026-06-30", progress: 40, status: "in-progress", milestones: [{ id: "m7", text: "Complete Node.js mastery", done: true }, { id: "m8", text: "Learn PostgreSQL & Redis", done: true }, { id: "m9", text: "Build 2 full-stack projects", done: false }, { id: "m10", text: "Deploy production applications", done: false }, { id: "m11", text: "Contribute to open source", done: false }], createdAt: "2026-02-01T10:00:00Z", updatedAt: "2026-03-08T10:00:00Z" },
+  ];
+
+  const notifications = [
+    { id: "notif-001", userId, type: "job", title: "New Job Match: Senior Frontend Developer at TechCorp", description: "95% match with your profile.", read: false, createdAt: "2026-03-14T08:00:00Z" },
+    { id: "notif-002", userId, type: "assessment", title: "Assessment Results Available", description: "Your JavaScript assessment score is ready. You scored 92%!", read: false, createdAt: "2026-03-14T05:00:00Z" },
+    { id: "notif-003", userId, type: "resume", title: "Resume Optimization Tip", description: "Add more quantified achievements to improve your ATS score.", read: false, createdAt: "2026-03-13T10:00:00Z" },
+    { id: "notif-004", userId, type: "learning", title: "Course Recommendation: System Design", description: "Based on your career goals, we recommend this advanced course.", read: true, createdAt: "2026-03-12T10:00:00Z" },
+    { id: "notif-005", userId, type: "job", title: "3 New Jobs in Your Preferred Location", description: "Remote positions matching your skills have been posted.", read: true, createdAt: "2026-03-11T10:00:00Z" },
+  ];
+
+  const activityLog = [
+    { id: "act-001", userId, action: "Completed JavaScript Assessment", type: "assessment", createdAt: "2026-03-14T08:00:00Z" },
+    { id: "act-002", userId, action: "Updated Frontend Developer resume", type: "resume", createdAt: "2026-03-14T05:00:00Z" },
+    { id: "act-003", userId, action: "Applied to 3 new positions", type: "job", createdAt: "2026-03-13T10:00:00Z" },
+    { id: "act-004", userId, action: "Started React Advanced course", type: "course", createdAt: "2026-03-12T10:00:00Z" },
+    { id: "act-005", userId, action: "Set Q1 career milestone", type: "career", createdAt: "2026-03-11T10:00:00Z" },
+  ];
+
+  return { users, resumes, jobs, assessments, userAssessments, courses, userCourses, careerGoals, notifications, activityLog };
+}
+
+module.exports = { getSeedData };

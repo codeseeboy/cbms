@@ -1,72 +1,20 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { findMany, updateOne, deleteOne } from "../db"
-import { getCurrentUser } from "../auth"
-import type {
-  User,
-  Resume,
-  Job,
-  UserAssessment,
-  UserCourse,
-  Notification,
-  JobApplication,
-} from "../types"
+import { apiGet, apiPut, apiDelete } from "../api"
 
 export async function getAdminData() {
-  const user = await getCurrentUser()
-  if (!user || user.role !== "admin") return null
-
-  const users = await findMany<User>("users")
-  const resumes = await findMany<Resume>("resumes")
-  const jobs = await findMany<Job>("jobs")
-  const assessments = await findMany<UserAssessment>("user_assessments")
-  const courses = await findMany<UserCourse>("user_courses")
-  const applications = await findMany<JobApplication>("job_applications")
-  const notifications = await findMany<Notification>("notifications")
-
-  const safeUsers = users.map(({ password: _, ...u }) => u)
-
-  return {
-    stats: {
-      totalUsers: users.length,
-      totalResumes: resumes.length,
-      totalJobs: jobs.length,
-      totalAssessments: assessments.length,
-      totalCourses: courses.length,
-      totalApplications: applications.length,
-    },
-    users: safeUsers,
-    recentUsers: safeUsers
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 10),
-    roleDistribution: {
-      jobseekers: users.filter((u) => u.role === "jobseeker").length,
-      recruiters: users.filter((u) => u.role === "recruiter").length,
-      coaches: users.filter((u) => u.role === "coach").length,
-      admins: users.filter((u) => u.role === "admin").length,
-    },
-  }
+  return apiGet("/api/admin/data")
 }
 
 export async function updateUserRole(userId: string, role: string) {
-  const admin = await getCurrentUser()
-  if (!admin || admin.role !== "admin") return { error: "Not authorized" }
-
-  await updateOne<User>("users", userId, {
-    role: role as User["role"],
-    updatedAt: new Date().toISOString(),
-  })
+  const result = await apiPut(`/api/admin/users/${userId}/role`, { role })
   revalidatePath("/dashboard/admin")
-  return { success: true }
+  return result
 }
 
 export async function deleteUser(userId: string) {
-  const admin = await getCurrentUser()
-  if (!admin || admin.role !== "admin") return { error: "Not authorized" }
-  if (userId === admin.id) return { error: "Cannot delete your own account" }
-
-  await deleteOne("users", userId)
+  const result = await apiDelete(`/api/admin/users/${userId}`)
   revalidatePath("/dashboard/admin")
-  return { success: true }
+  return result
 }

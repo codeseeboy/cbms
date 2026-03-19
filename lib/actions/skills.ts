@@ -1,138 +1,41 @@
 "use server"
 
-import { v4 as uuid } from "uuid"
 import { revalidatePath } from "next/cache"
-import { findMany, findOne, insertOne, updateOne } from "../db"
-import { getCurrentUser } from "../auth"
+import { apiGet, apiPost } from "../api"
 import type { Assessment, UserAssessment } from "../types"
 
 export async function getAssessments() {
-  return await findMany<Assessment>("assessments")
+  return (await apiGet<Assessment[]>("/api/assessments")) || []
 }
 
 export async function getAssessment(id: string) {
-  return (await findOne<Assessment>("assessments", (a) => a.id === id)) || null
+  return apiGet<Assessment>(`/api/assessments/${id}`)
 }
 
 export async function getUserAssessments() {
-  const user = await getCurrentUser()
-  if (!user) return []
-  return await findMany<UserAssessment>("user_assessments", (ua) => ua.userId === user.id)
+  return (await apiGet<UserAssessment[]>("/api/user-assessments")) || []
 }
 
 export async function getUserAssessment(assessmentId: string) {
-  const user = await getCurrentUser()
-  if (!user) return null
-  return (
-    (await findOne<UserAssessment>(
-      "user_assessments",
-      (ua) => ua.userId === user.id && ua.assessmentId === assessmentId
-    )) || null
-  )
+  return apiGet<UserAssessment>(`/api/user-assessments/${assessmentId}`)
 }
 
 export async function startAssessment(assessmentId: string) {
-  const user = await getCurrentUser()
-  if (!user) return { error: "Not authenticated" }
-
-  const assessment = await findOne<Assessment>("assessments", (a) => a.id === assessmentId)
-  if (!assessment) return { error: "Assessment not found" }
-
-  const existing = await findOne<UserAssessment>(
-    "user_assessments",
-    (ua) => ua.userId === user.id && ua.assessmentId === assessmentId
-  )
-
-  if (existing && existing.status === "completed") {
-    await updateOne<UserAssessment>("user_assessments", existing.id, {
-      score: null,
-      answers: assessment.questions.map(() => null),
-      currentQuestion: 0,
-      status: "in-progress",
-      startedAt: new Date().toISOString(),
-      completedAt: null,
-    })
-    revalidatePath("/dashboard/skills")
-    return { success: true, id: existing.id }
-  }
-
-  if (existing && existing.status === "in-progress") {
-    return { success: true, id: existing.id }
-  }
-
-  const ua: UserAssessment = {
-    id: uuid(),
-    userId: user.id,
-    assessmentId,
-    score: null,
-    answers: assessment.questions.map(() => null),
-    currentQuestion: 0,
-    status: "in-progress",
-    startedAt: new Date().toISOString(),
-    completedAt: null,
-  }
-
-  await insertOne("user_assessments", ua)
+  const result = await apiPost(`/api/assessments/${assessmentId}/start`)
   revalidatePath("/dashboard/skills")
-  return { success: true, id: ua.id }
+  return result
 }
 
 export async function submitAnswer(assessmentId: string, questionIndex: number, answer: number) {
-  const user = await getCurrentUser()
-  if (!user) return { error: "Not authenticated" }
-
-  const ua = await findOne<UserAssessment>(
-    "user_assessments",
-    (u) => u.userId === user.id && u.assessmentId === assessmentId
-  )
-  if (!ua || ua.status !== "in-progress") return { error: "No active assessment" }
-
-  const newAnswers = [...ua.answers]
-  newAnswers[questionIndex] = answer
-
-  await updateOne<UserAssessment>("user_assessments", ua.id, {
-    answers: newAnswers,
-    currentQuestion: questionIndex + 1,
-  })
-
-  return { success: true }
-}
-
-export async function getAssessmentHistory() {
-  const user = await getCurrentUser()
-  if (!user) return []
-  const all = await findMany<UserAssessment>("user_assessments", (ua) => ua.userId === user.id)
-  return all
-    .filter((ua) => ua.status === "completed" && ua.completedAt)
-    .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
+  return apiPost(`/api/assessments/${assessmentId}/answer`, { questionIndex, answer })
 }
 
 export async function completeAssessment(assessmentId: string) {
-  const user = await getCurrentUser()
-  if (!user) return { error: "Not authenticated" }
-
-  const assessment = await findOne<Assessment>("assessments", (a) => a.id === assessmentId)
-  if (!assessment) return { error: "Assessment not found" }
-
-  const ua = await findOne<UserAssessment>(
-    "user_assessments",
-    (u) => u.userId === user.id && u.assessmentId === assessmentId
-  )
-  if (!ua) return { error: "No active assessment" }
-
-  let correct = 0
-  ua.answers.forEach((answer, idx) => {
-    if (answer === assessment.questions[idx]?.correctAnswer) correct++
-  })
-  const score = Math.round((correct / assessment.questions.length) * 100)
-
-  await updateOne<UserAssessment>("user_assessments", ua.id, {
-    score,
-    status: "completed",
-    completedAt: new Date().toISOString(),
-    currentQuestion: assessment.questions.length,
-  })
-
+  const result = await apiPost(`/api/assessments/${assessmentId}/complete`)
   revalidatePath("/dashboard/skills")
-  return { success: true, score }
+  return result
+}
+
+export async function getAssessmentHistory() {
+  return (await apiGet<UserAssessment[]>("/api/assessment-history")) || []
 }

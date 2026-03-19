@@ -3,13 +3,13 @@ import { setSessionCookie, clearSessionCookie } from "@/lib/auth"
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as { userId?: string }
-    const userId = String(body?.userId || "")
-    if (!userId) {
-      return NextResponse.json({ success: false, error: "userId is required" }, { status: 400 })
+    const body = (await req.json()) as { token?: string }
+    const token = String(body?.token || "")
+    if (!token) {
+      return NextResponse.json({ success: false, error: "token is required" }, { status: 400 })
     }
 
-    await setSessionCookie(userId)
+    await setSessionCookie(token)
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ success: false, error: "Failed to create session" }, { status: 500 })

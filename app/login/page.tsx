@@ -42,7 +42,7 @@ export default function LoginPage() {
         await fetch("/api/auth/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: authData.user.id }),
+          body: JSON.stringify({ token: authData.token }),
         })
         router.push("/dashboard")
       }

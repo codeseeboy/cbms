@@ -1,136 +1,58 @@
 "use server"
 
-import { v4 as uuid } from "uuid"
 import { revalidatePath } from "next/cache"
-import { findMany, insertOne, deleteOne, findOne, updateOne } from "../db"
-import { getCurrentUser } from "../auth"
+import { apiGet, apiPost, apiPut, apiDelete } from "../api"
 import type { Job, JobBookmark, JobApplication, AppliedJob } from "../types"
 
 export async function getJobs(search?: string) {
-  const jobs = await findMany<Job>("jobs")
-  if (!search) return jobs
-  const q = search.toLowerCase()
-  return jobs.filter(
-    (j) =>
-      j.title.toLowerCase().includes(q) ||
-      j.company.toLowerCase().includes(q) ||
-      j.tags.some((t) => t.toLowerCase().includes(q))
-  )
+  const qs = search ? `?search=${encodeURIComponent(search)}` : ""
+  return (await apiGet<Job[]>(`/api/jobs${qs}`)) || []
 }
 
 export async function getJob(id: string) {
-  return (await findOne<Job>("jobs", (j) => j.id === id)) || null
+  return apiGet<Job>(`/api/jobs/${id}`)
 }
 
 export async function getBookmarks() {
-  const user = await getCurrentUser()
-  if (!user) return []
-  return await findMany<JobBookmark>("job_bookmarks", (b) => b.userId === user.id)
+  return (await apiGet<JobBookmark[]>("/api/bookmarks")) || []
 }
 
 export async function toggleBookmark(jobId: string) {
-  const user = await getCurrentUser()
-  if (!user) return { error: "Not authenticated" }
-
-  const existing = await findOne<JobBookmark>(
-    "job_bookmarks",
-    (b) => b.userId === user.id && b.jobId === jobId
-  )
-
-  if (existing) {
-    await deleteOne("job_bookmarks", existing.id)
-  } else {
-    await insertOne("job_bookmarks", {
-      id: uuid(),
-      userId: user.id,
-      jobId,
-      createdAt: new Date().toISOString(),
-    })
-  }
-
+  const result = await apiPost(`/api/bookmarks/${jobId}`)
   revalidatePath("/dashboard/jobs")
-  return { success: true, bookmarked: !existing }
+  return result
 }
 
 export async function applyToJob(jobId: string) {
-  const user = await getCurrentUser()
-  if (!user) return { error: "Not authenticated" }
-
-  const existing = await findOne<JobApplication>(
-    "job_applications",
-    (a) => a.userId === user.id && a.jobId === jobId
-  )
-  if (existing) return { error: "Already applied to this job" }
-
-  await insertOne("job_applications", {
-    id: uuid(),
-    userId: user.id,
-    jobId,
-    status: "applied",
-    appliedAt: new Date().toISOString(),
-  })
-
+  const result = await apiPost(`/api/jobs/${jobId}/apply`)
   revalidatePath("/dashboard/jobs")
-  return { success: true }
+  return result
 }
 
 export async function getApplications() {
-  const user = await getCurrentUser()
-  if (!user) return []
-  return await findMany<JobApplication>("job_applications", (a) => a.userId === user.id)
+  return (await apiGet<JobApplication[]>("/api/applications")) || []
 }
 
 export async function getAppliedJobs() {
-  const user = await getCurrentUser()
-  if (!user) return []
-  return await findMany<AppliedJob>("applied_jobs", (a) => a.userId === user.id)
+  return (await apiGet<AppliedJob[]>("/api/applied-jobs")) || []
 }
 
 export async function saveAppliedJob(data: {
   title: string; company: string; url: string; location: string; matchScore: number; status: AppliedJob["status"]; notes?: string
 }) {
-  const user = await getCurrentUser()
-  if (!user) return { error: "Not authenticated" }
-
-  const job: AppliedJob = {
-    id: uuid(),
-    userId: user.id,
-    title: data.title,
-    company: data.company,
-    url: data.url,
-    location: data.location,
-    matchScore: data.matchScore,
-    status: data.status,
-    notes: data.notes || "",
-    appliedAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }
-
-  await insertOne("applied_jobs", job)
+  const result = await apiPost("/api/applied-jobs", data)
   revalidatePath("/dashboard/jobs")
-  return { success: true, id: job.id }
+  return result
 }
 
 export async function updateAppliedJobStatus(id: string, status: AppliedJob["status"]) {
-  const user = await getCurrentUser()
-  if (!user) return { error: "Not authenticated" }
-
-  const existing = await findOne<AppliedJob>("applied_jobs", (a) => a.id === id && a.userId === user.id)
-  if (!existing) return { error: "Job not found" }
-
-  await updateOne("applied_jobs", id, { status, updatedAt: new Date().toISOString() })
+  const result = await apiPut(`/api/applied-jobs/${id}/status`, { status })
   revalidatePath("/dashboard/jobs")
-  return { success: true }
+  return result
 }
 
 export async function deleteAppliedJob(id: string) {
-  const user = await getCurrentUser()
-  if (!user) return { error: "Not authenticated" }
-
-  const existing = await findOne<AppliedJob>("applied_jobs", (a) => a.id === id && a.userId === user.id)
-  if (!existing) return { error: "Job not found" }
-
-  await deleteOne("applied_jobs", id)
+  const result = await apiDelete(`/api/applied-jobs/${id}`)
   revalidatePath("/dashboard/jobs")
-  return { success: true }
+  return result
 }

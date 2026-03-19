@@ -1,34 +1,20 @@
 "use server"
 
-import { getCurrentUser } from "../auth"
-import { updateOne } from "../db"
-import type { SafeUser, User } from "../types"
+import { apiGet, apiPut } from "../api"
+import type { SafeUser } from "../types"
 
 export async function getProfile(): Promise<SafeUser | null> {
-  return getCurrentUser()
+  return apiGet<SafeUser>("/api/profile")
 }
 
 export async function updateProfile(formData: FormData) {
-  const user = await getCurrentUser()
-  if (!user) return { error: "Not authenticated" }
-
-  const updates: Partial<User> = {
-    name: formData.get("name") as string,
-    phone: formData.get("phone") as string,
-    location: formData.get("location") as string,
-    title: formData.get("title") as string,
-    bio: formData.get("bio") as string,
-    updatedAt: new Date().toISOString(),
+  const body: Record<string, any> = {}
+  for (const key of ["name", "phone", "location", "title", "bio"]) {
+    body[key] = formData.get(key) as string
   }
-
   const skillsStr = formData.get("skills") as string
   if (skillsStr) {
-    updates.skills = skillsStr
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
+    body.skills = skillsStr.split(",").map((s) => s.trim()).filter(Boolean)
   }
-
-  await updateOne("users", user.id, updates)
-  return { success: true }
+  return apiPut("/api/profile", body)
 }
