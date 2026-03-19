@@ -156,6 +156,9 @@ export default function SignupPage() {
                   <option value="recruiter">Recruiter</option>
                   <option value="coach">Career Coach</option>
                 </select>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Admin accounts are provisioned by system administrators.
+                </p>
               </div>
 
               <Button

@@ -8,11 +8,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   LayoutDashboard, FileText, Briefcase, BarChart3, BookOpen, Map, Bell,
-  Settings, LogOut, Rocket, ChevronLeft, ChevronRight, Search, User, Shield,
-  Menu, X,
+  Settings, LogOut, Rocket, ChevronLeft, ChevronRight, Search, User,
+  Menu, X, Users, LineChart, CircleHelp,
 } from "lucide-react"
 import { logoutAction } from "@/lib/actions/auth"
 
+/** Job Seeker — SRS: resume, job recs, assessments, learning, career planning */
 const sidebarLinks = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Resume Builder", href: "/dashboard/resume", icon: FileText },
@@ -21,7 +22,52 @@ const sidebarLinks = [
   { label: "Learning", href: "/dashboard/learning", icon: BookOpen },
   { label: "Career Planning", href: "/dashboard/career", icon: Map },
   { label: "Notifications", href: "/dashboard/notifications", icon: Bell },
+  { label: "Help & FAQ", href: "/dashboard/help", icon: CircleHelp },
 ]
+
+/** Administrator — SRS: manage users, manage content, monitor analytics (no job-seeker tools) */
+const adminLinks = [
+  { label: "Overview", href: "/dashboard/admin", icon: LayoutDashboard },
+  { label: "Users", href: "/dashboard/admin/users", icon: Users },
+  { label: "Job content", href: "/dashboard/admin/jobs", icon: Briefcase },
+  { label: "Notifications", href: "/dashboard/notifications", icon: Bell },
+  { label: "Help & FAQ", href: "/dashboard/help", icon: CircleHelp },
+]
+
+/** Recruiter — SRS: search candidates, view profiles */
+const recruiterLinks = [
+  { label: "Overview", href: "/dashboard/recruiter", icon: LayoutDashboard },
+  { label: "Job Requests", href: "/dashboard/recruiter/requests", icon: Briefcase },
+  { label: "Candidates", href: "/dashboard/recruiter/candidates", icon: Users },
+  { label: "Messages", href: "/dashboard/recruiter/messages", icon: Search },
+  { label: "Notifications", href: "/dashboard/notifications", icon: Bell },
+  { label: "Help & FAQ", href: "/dashboard/help", icon: CircleHelp },
+]
+
+/** Career Coach — SRS: monitor user progress, provide guidance */
+const coachLinks = [
+  { label: "Overview", href: "/dashboard/coach", icon: LayoutDashboard },
+  { label: "Learners", href: "/dashboard/coach/learners", icon: Users },
+  { label: "Content Studio", href: "/dashboard/coach/content", icon: BookOpen },
+  { label: "Notifications", href: "/dashboard/notifications", icon: Bell },
+  { label: "Help & FAQ", href: "/dashboard/help", icon: CircleHelp },
+]
+
+function navLinkActive(pathname: string, href: string) {
+  if (href === "/dashboard/admin") {
+    return pathname === "/dashboard/admin" || pathname === "/dashboard/admin/"
+  }
+  if (href === "/dashboard/admin/users") return pathname.startsWith("/dashboard/admin/users")
+  if (href === "/dashboard/admin/jobs") return pathname.startsWith("/dashboard/admin/jobs")
+  if (href === "/dashboard/recruiter") return pathname === "/dashboard/recruiter" || pathname === "/dashboard/recruiter/"
+  if (href === "/dashboard/recruiter/requests") return pathname.startsWith("/dashboard/recruiter/requests")
+  if (href === "/dashboard/recruiter/candidates") return pathname.startsWith("/dashboard/recruiter/candidates")
+  if (href === "/dashboard/recruiter/messages") return pathname.startsWith("/dashboard/recruiter/messages")
+  if (href === "/dashboard/coach") return pathname === "/dashboard/coach" || pathname === "/dashboard/coach/"
+  if (href === "/dashboard/coach/learners") return pathname.startsWith("/dashboard/coach/learners")
+  if (href === "/dashboard/coach/content") return pathname.startsWith("/dashboard/coach/content")
+  return pathname === href
+}
 
 const bottomLinks = [
   { label: "Profile", href: "/dashboard/profile", icon: User },
@@ -39,9 +85,14 @@ export function DashboardSidebar({ user }: SidebarProps) {
 
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
-  const allLinks = user.role === "admin"
-    ? [...sidebarLinks, { label: "Admin Panel", href: "/dashboard/admin", icon: Shield }]
-    : sidebarLinks
+  const allLinks =
+    user.role === "admin"
+      ? adminLinks
+      : user.role === "recruiter"
+        ? recruiterLinks
+        : user.role === "coach"
+          ? coachLinks
+          : sidebarLinks
 
   const roleLabel = user.role === "jobseeker" ? "Job Seeker" : user.role === "recruiter" ? "Recruiter" : user.role === "coach" ? "Career Coach" : "Admin"
 
@@ -61,7 +112,7 @@ export function DashboardSidebar({ user }: SidebarProps) {
         </button>
       </div>
 
-      {!collapsed && (
+      {!collapsed && user.role === "jobseeker" && (
         <div className="px-3 pt-3 pb-2">
           <div className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/50 px-3 py-1.5">
             <Search className="h-3.5 w-3.5 text-muted-foreground" />
@@ -73,7 +124,7 @@ export function DashboardSidebar({ user }: SidebarProps) {
       <ScrollArea className="flex-1 px-3 py-2">
         <nav className="flex flex-col gap-0.5">
           {allLinks.map((link) => {
-            const isActive = pathname === link.href
+            const isActive = navLinkActive(pathname, link.href)
             return (
               <Link key={link.href} href={link.href}
                 className={cn(

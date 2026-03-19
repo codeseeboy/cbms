@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useEffect, useTransition } from "react"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import {
   Users,
   FileText,
@@ -12,101 +13,63 @@ import {
   BarChart3,
   BookOpen,
   Shield,
-  Trash2,
   UserCheck,
+  ArrowUpRight,
+  Sparkles,
 } from "lucide-react"
-import { getAdminData, updateUserRole, deleteUser } from "@/lib/actions/admin"
+import { getAdminData } from "@/lib/actions/admin"
+import type { AdminData } from "@/lib/admin-types"
+import { AdminPageHeader } from "@/components/dashboard/admin-page-header"
+import { useRealtimeQuery } from "@/lib/hooks/use-realtime-query"
 
-interface AdminData {
-  stats: {
-    totalUsers: number
-    totalResumes: number
-    totalJobs: number
-    totalAssessments: number
-    totalCourses: number
-    totalApplications: number
-  }
-  users: any[]
-  recentUsers: any[]
-  roleDistribution: {
-    jobseekers: number
-    recruiters: number
-    coaches: number
-    admins: number
-  }
-}
-
-export default function AdminPage() {
-  const [data, setData] = useState<AdminData | null>(null)
-  const [isPending, startTransition] = useTransition()
-
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function loadData() {
-    const d = await getAdminData()
-    setData(d)
-  }
-
-  function handleRoleChange(userId: string, newRole: string) {
-    startTransition(async () => {
-      await updateUserRole(userId, newRole)
-      await loadData()
-    })
-  }
-
-  function handleDeleteUser(userId: string) {
-    if (!confirm("Are you sure you want to delete this user?")) return
-    startTransition(async () => {
-      await deleteUser(userId)
-      await loadData()
-    })
-  }
+export default function AdminOverviewPage() {
+  const queryClient = useQueryClient()
+  const { data, isFetching, dataUpdatedAt } = useRealtimeQuery<AdminData | null>({
+    queryKey: ["admin", "overview"],
+    queryFn: () => getAdminData(),
+    realtimeMs: 20_000,
+    staleMs: 20_000,
+  })
+  const refreshMutation = useMutation({
+    mutationFn: () => getAdminData(),
+    onSuccess: (next) => {
+      queryClient.setQueryData(["admin", "overview"], next)
+      queryClient.invalidateQueries({ queryKey: ["admin"] })
+    },
+  })
+  const lastUpdated = data ? new Date(dataUpdatedAt) : null
 
   if (!data) {
     return (
-      <div className="flex items-center justify-center p-12">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
           <Shield className="mx-auto h-12 w-12 text-muted-foreground/30" />
-          <p className="mt-3 text-foreground font-medium">
-            Loading admin panel...
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            You need admin privileges to access this page.
-          </p>
+          <p className="mt-3 font-medium text-foreground">Loading overview…</p>
+          <p className="mt-1 text-sm text-muted-foreground">Fetching live stats from the database.</p>
         </div>
       </div>
     )
   }
 
-  const roleColors: Record<string, string> = {
-    jobseeker: "border-blue-400/30 text-blue-400",
-    recruiter: "border-emerald-400/30 text-emerald-400",
-    coach: "border-amber-400/30 text-amber-400",
-    admin: "border-pink-400/30 text-pink-400",
-  }
+  const roleSeries = [
+    { label: "Job Seekers", value: data.roleDistribution.jobseekers, color: "bg-blue-400" },
+    { label: "Recruiters", value: data.roleDistribution.recruiters, color: "bg-emerald-400" },
+    { label: "Career Coaches", value: data.roleDistribution.coaches, color: "bg-amber-400" },
+    { label: "Admins", value: data.roleDistribution.admins, color: "bg-pink-400" },
+  ]
+  const maxRoleValue = Math.max(...roleSeries.map((r) => r.value), 1)
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      <div className="mb-6 sm:mb-8">
-        <div className="flex items-center gap-3">
-          <Shield className="h-7 w-7 text-primary" />
-          <div>
-            <h1
-              className="text-xl sm:text-2xl font-bold text-foreground lg:text-3xl"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              Admin Panel
-            </h1>
-            <p className="mt-1 text-muted-foreground">
-              Manage users, monitor analytics, and moderate content.
-            </p>
-          </div>
-        </div>
-      </div>
+    <div>
+      <AdminPageHeader
+        title="Admin Dashboard"
+        subtitle="Monitor platform health, manage users, and moderate content."
+        onRefresh={() => refreshMutation.mutate()}
+        isRefreshing={isFetching || refreshMutation.isPending}
+        lastUpdated={lastUpdated}
+      />
 
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         {[
           { label: "Users", value: data.stats.totalUsers, icon: Users, color: "text-blue-400", bg: "bg-blue-400/10" },
           { label: "Resumes", value: data.stats.totalResumes, icon: FileText, color: "text-emerald-400", bg: "bg-emerald-400/10" },
@@ -131,88 +94,135 @@ export default function AdminPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-1">
-          <Card className="border-border bg-card py-0">
-            <CardHeader className="pb-4 pt-6 px-6">
+      <div className="mb-6 grid gap-4 xl:grid-cols-3">
+        <Card className="border-border bg-card py-0 xl:col-span-2">
+          <CardHeader className="pb-3 pt-5 px-5 sm:px-6">
+            <div className="flex items-center justify-between">
               <CardTitle className="text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
-                User Distribution
+                User Role Distribution
               </CardTitle>
-            </CardHeader>
-            <CardContent className="px-6 pb-6">
-              <div className="flex flex-col gap-3">
-                {[
-                  { role: "Job Seekers", count: data.roleDistribution.jobseekers, color: "bg-blue-400" },
-                  { role: "Recruiters", count: data.roleDistribution.recruiters, color: "bg-emerald-400" },
-                  { role: "Career Coaches", count: data.roleDistribution.coaches, color: "bg-amber-400" },
-                  { role: "Admins", count: data.roleDistribution.admins, color: "bg-pink-400" },
-                ].map((item) => (
-                  <div key={item.role} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`h-3 w-3 rounded-full ${item.color}`} />
-                      <span className="text-sm text-foreground">{item.role}</span>
-                    </div>
-                    <span className="text-sm font-medium text-foreground">{item.count}</span>
+              <Badge variant="outline" className="border-primary/30 text-primary">
+                Live
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 px-5 pb-5 sm:px-6 sm:pb-6">
+            {roleSeries.map((item) => (
+              <div key={item.label}>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
+                    <span className="text-sm text-foreground">{item.label}</span>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="lg:col-span-2">
-          <Card className="border-border bg-card py-0">
-            <CardHeader className="pb-4 pt-6 px-6">
-              <CardTitle className="text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
-                All Users ({data.users.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-6 pb-6">
-              <div className="flex flex-col gap-3">
-                {data.users.map((user) => (
+                  <span className="text-sm font-medium text-foreground">{item.value}</span>
+                </div>
+                <div className="h-2 rounded-full bg-secondary">
                   <div
-                    key={user.id}
-                    className="flex items-center justify-between rounded-xl border border-border bg-secondary/30 p-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 border border-border">
-                        <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                          {user.avatar}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{user.name}</p>
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={user.role}
-                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                        disabled={isPending}
-                        className="rounded-lg border border-border bg-secondary px-2 py-1 text-xs text-foreground"
-                      >
-                        <option value="jobseeker">Job Seeker</option>
-                        <option value="recruiter">Recruiter</option>
-                        <option value="coach">Coach</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteUser(user.id)}
-                        disabled={isPending}
-                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                    className={`h-2 rounded-full ${item.color}`}
+                    style={{ width: `${Math.max((item.value / maxRoleValue) * 100, item.value ? 10 : 0)}%` }}
+                  />
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card py-0">
+          <CardHeader className="pb-3 pt-5 px-5 sm:px-6">
+            <CardTitle className="text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
+              Quick Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 px-5 pb-5 sm:px-6 sm:pb-6">
+            <Button asChild className="w-full justify-between bg-primary text-primary-foreground">
+              <Link href="/dashboard/admin/users">
+                Manage users
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full justify-between border-border">
+              <Link href="/dashboard/admin/jobs">
+                Manage job content
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
+              <div className="mb-1 flex items-center gap-1.5 text-primary">
+                <Sparkles className="h-3.5 w-3.5" />
+                Clean admin workflow
+              </div>
+              Use left sidebar for navigation. This page is now overview-only.
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="border-border bg-card py-0">
+          <CardHeader className="flex flex-row items-center justify-between pb-4 pt-6 px-6">
+            <CardTitle className="text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
+              Recent users
+            </CardTitle>
+            <Button variant="ghost" size="sm" className="gap-1 text-primary" asChild>
+              <Link href="/dashboard/admin/users">
+                View all
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            <div className="flex flex-col gap-3">
+              {data.recentUsers.slice(0, 5).map((u) => (
+                <div key={u.id} className="flex items-center gap-3 rounded-lg border border-border bg-secondary/30 p-3">
+                  <Avatar className="h-9 w-9 border border-border">
+                    <AvatarFallback className="bg-primary/10 text-[10px] font-semibold text-primary">{u.avatar}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">{u.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                  </div>
+                  <span className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[10px] text-muted-foreground capitalize">
+                    {u.role}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-card py-0">
+          <CardHeader className="flex flex-row items-center justify-between pb-4 pt-6 px-6">
+            <CardTitle className="text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
+              Recently joined
+            </CardTitle>
+            <Button variant="ghost" size="sm" className="gap-1 text-primary" asChild>
+              <Link href="/dashboard/admin/users">
+                View all
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            <div className="flex flex-col gap-3">
+              {[
+                { label: "Total Users", value: data.stats.totalUsers, help: "All active accounts" },
+                { label: "Recruiters", value: data.roleDistribution.recruiters, help: "Hiring side accounts" },
+                { label: "Coaches", value: data.roleDistribution.coaches, help: "Guidance accounts" },
+                { label: "Admins", value: data.roleDistribution.admins, help: "System managers" },
+              ].map((s) => (
+                <div key={s.label} className="flex items-center justify-between rounded-lg border border-border bg-secondary/25 px-3 py-2.5">
+                  <div>
+                    <p className="text-sm text-foreground">{s.label}</p>
+                    <p className="text-[11px] text-muted-foreground">{s.help}</p>
+                  </div>
+                  <p className="text-lg font-bold text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
+                    {s.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

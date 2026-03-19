@@ -52,6 +52,10 @@ export default async function DashboardPage() {
 
   const { user, stats, recentActivity, topJobs, skillProgress } = data
 
+  if (user.role === "admin") redirect("/dashboard/admin")
+  if (user.role === "recruiter") redirect("/dashboard/recruiter")
+  if (user.role === "coach") redirect("/dashboard/coach")
+
   const statCards = [
     {
       title: "Resumes",

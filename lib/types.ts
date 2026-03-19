@@ -245,3 +245,146 @@ export interface ActivityLog {
 }
 
 export type SafeUser = Omit<User, "password">
+
+export interface RecruiterCandidate extends SafeUser {
+  stats: {
+    resumes: number
+    experienceYears: number
+    completedAssessments: number
+    avgScore: number
+    completedCourses: number
+  }
+}
+
+export interface RecruiterCandidateDetail {
+  candidate: SafeUser
+  resumes: {
+    id: string
+    title: string
+    updatedAt: string
+    completeness: number
+    skills: string[]
+    experience: {
+      id: string
+      title: string
+      company: string
+      period: string
+      description: string
+    }[]
+    summary: string
+  }[]
+  insights: {
+    avgAssessmentScore: number
+    completedAssessments: number
+    completedCourses: number
+    activeGoals: number
+  }
+  viewerRole: string
+}
+
+export interface CoachLearnerProgress {
+  user: SafeUser
+  metrics: {
+    completedAssessments: number
+    avgAssessmentScore: number
+    completedCourses: number
+    inProgressCourses: number
+    goalsProgress: number
+    totalGoals: number
+    notesCount: number
+  }
+}
+
+export interface CoachGuidanceNote {
+  id: string
+  userId: string
+  coachId: string
+  coachName: string
+  text: string
+  createdAt: string
+}
+
+export interface CoachOverview {
+  stats: {
+    learnersCount: number
+    completedAssessments: number
+    avgGoalProgress: number
+    coachCourses: number
+    activeLearners: number
+    guidanceCount: number
+  }
+  recentGuidance: CoachGuidanceNote[]
+}
+
+export interface CoachContentCourse {
+  id: string
+  title: string
+  instructor: string
+  category: string
+  level: "Beginner" | "Intermediate" | "Advanced"
+  totalVideos: number
+  createdAt?: string
+  modules: {
+    id: string
+    title: string
+    videos: {
+      id: string
+      title: string
+      youtubeId: string
+      duration: string
+      order: number
+    }[]
+  }[]
+}
+
+export interface RecruiterOverview {
+  stats: {
+    companyJobs: number
+    requests: number
+    byStatus: Record<string, number>
+  }
+  recentRequests: RecruiterRequest[]
+}
+
+export interface RecruiterRequest {
+  id: string
+  userId: string
+  jobId: string
+  status: "applied" | "reviewing" | "interview" | "offered" | "rejected"
+  recruiterNote?: string
+  appliedAt: string
+  updatedAt?: string
+  job: {
+    id: string
+    title: string
+    company: string
+    location?: string
+    type?: string
+  } | null
+  candidate: {
+    id: string
+    name: string
+    email: string
+    avatar: string
+    title?: string
+    location?: string
+    skills: string[]
+  } | null
+  profile: {
+    resumeCount: number
+    resumeCompleteness: number
+    experienceYears: number
+    avgAssessmentScore: number
+  }
+  messageCount: number
+}
+
+export interface RecruiterChatMessage {
+  id: string
+  applicationId: string
+  senderId: string
+  senderRole: "recruiter" | "jobseeker"
+  senderName: string
+  text: string
+  createdAt: string
+}

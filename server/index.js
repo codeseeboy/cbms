@@ -58,8 +58,8 @@ async function getDb() {
 }
 
 // ── JWT helpers ──────────────────────────────────────────────────────
-function signToken(userId) {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: "7d" });
+function signToken(userId, role) {
+  return jwt.sign({ userId, role: role || "jobseeker" }, JWT_SECRET, { expiresIn: "7d" });
 }
 
 function verifyToken(token) {
@@ -75,6 +75,48 @@ function authMiddleware(req, res, next) {
   if (!payload) return res.status(401).json({ error: "Invalid or expired token" });
   req.userId = payload.userId;
   next();
+}
+
+async function requireRoles(req, res, roles) {
+  const user = await findById("users", req.userId);
+  if (!user || !roles.includes(user.role)) {
+    res.status(403).json({ error: "Not authorized" });
+    return null;
+  }
+  return user;
+}
+
+function normalizeCompanyKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function getRecruiterCompanyKeys(user) {
+  const keys = new Set();
+  const email = String(user?.email || "").toLowerCase();
+  if (email.includes("@")) {
+    const domain = email.split("@")[1] || "";
+    const base = domain.split(".")[0] || "";
+    if (base) keys.add(normalizeCompanyKey(base));
+  }
+  if (user?.title) {
+    String(user.title)
+      .split(/\s+/)
+      .map((w) => normalizeCompanyKey(w))
+      .filter((w) => w.length >= 4)
+      .forEach((w) => keys.add(w));
+  }
+  return [...keys];
+}
+
+function jobMatchesRecruiter(job, recruiter) {
+  if (!job) return false;
+  if (job.createdBy && recruiter?.id && job.createdBy === recruiter.id) return true;
+  const companyKey = normalizeCompanyKey(job.company);
+  const recruiterKeys = getRecruiterCompanyKeys(recruiter);
+  if (!companyKey || recruiterKeys.length === 0) return false;
+  return recruiterKeys.some((k) => companyKey.includes(k) || k.includes(companyKey));
 }
 
 // ── DB helper shortcuts ──────────────────────────────────────────────
@@ -151,7 +193,7 @@ app.post("/api/auth/login", async (req, res) => {
     if (!user) return res.status(401).json({ success: false, error: "Invalid email or password" });
     if (!compareSync(password, String(user.password || ""))) return res.status(401).json({ success: false, error: "Invalid email or password" });
 
-    const token = signToken(user.id);
+    const token = signToken(user.id, user.role);
     const { password: _, ...safeUser } = user;
     return res.json({ success: true, token, user: safeUser });
   } catch (err) {
@@ -166,9 +208,13 @@ app.post("/api/auth/signup", async (req, res) => {
     const name = String(req.body?.name || "").trim();
     const email = String(req.body?.email || "").trim().toLowerCase();
     const password = String(req.body?.password || "");
-    const role = String(req.body?.role || "jobseeker");
+    const requestedRole = String(req.body?.role || "jobseeker").trim().toLowerCase();
+    const allowedSignupRoles = new Set(["jobseeker", "recruiter", "coach"]);
+    const role = allowedSignupRoles.has(requestedRole) ? requestedRole : "jobseeker";
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!name || !email || !password) return res.status(400).json({ success: false, error: "All fields are required" });
+    if (!emailRegex.test(email)) return res.status(422).json({ success: false, error: "Invalid email format" });
     if (password.length < 6) return res.status(400).json({ success: false, error: "Password must be at least 6 characters" });
 
     const existing = await (await col("users")).findOne({ email }, { projection: { _id: 1 } });
@@ -181,7 +227,7 @@ app.post("/api/auth/signup", async (req, res) => {
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
     await insertDoc("users", user);
-    const token = signToken(user.id);
+    const token = signToken(user.id, user.role);
     const { password: _, ...safeUser } = user;
     return res.status(201).json({ success: true, token, user: safeUser });
   } catch (err) {
@@ -342,9 +388,61 @@ app.post("/api/bookmarks/:jobId", authMiddleware, async (req, res) => {
 });
 
 app.post("/api/jobs/:id/apply", authMiddleware, async (req, res) => {
+  const job = await findById("jobs", req.params.id);
+  if (!job) return res.status(404).json({ error: "Job not found" });
+
   const existing = await (await col("job_applications")).findOne({ userId: req.userId, jobId: req.params.id });
   if (existing) return res.status(409).json({ error: "Already applied to this job" });
-  await insertDoc("job_applications", { id: randomUUID(), userId: req.userId, jobId: req.params.id, status: "applied", appliedAt: new Date().toISOString() });
+
+  const now = new Date().toISOString();
+  await insertDoc("job_applications", {
+    id: randomUUID(),
+    userId: req.userId,
+    jobId: req.params.id,
+    jobTitle: job.title || "",
+    company: job.company || "",
+    status: "applied",
+    recruiterNote: "",
+    appliedAt: now,
+    updatedAt: now,
+  });
+
+  const existingApplied = await (await col("applied_jobs")).findOne({
+    userId: req.userId,
+    title: job.title,
+    company: job.company,
+  });
+  if (!existingApplied) {
+    await insertDoc("applied_jobs", {
+      id: randomUUID(),
+      userId: req.userId,
+      title: job.title,
+      company: job.company,
+      url: "",
+      location: job.location || "",
+      matchScore: Number(job.match || 0),
+      status: "applied",
+      notes: "",
+      appliedAt: now,
+      updatedAt: now,
+    });
+  }
+
+  const candidate = await findById("users", req.userId);
+  const recruiters = await findAll("users", { role: "recruiter" });
+  const matchedRecruiters = recruiters.filter((r) => jobMatchesRecruiter(job, r));
+  for (const recruiter of matchedRecruiters) {
+    await insertDoc("notifications", {
+      id: randomUUID(),
+      userId: recruiter.id,
+      type: "job",
+      title: "New candidate application",
+      description: `${candidate?.name || "A candidate"} applied for ${job.title} at ${job.company}.`,
+      read: false,
+      createdAt: now,
+    });
+  }
+
   res.json({ success: true });
 });
 
@@ -633,6 +731,646 @@ app.delete("/api/admin/users/:id", authMiddleware, async (req, res) => {
   res.json({ success: true });
 });
 
+app.get("/api/admin/jobs", authMiddleware, async (req, res) => {
+  const admin = await findById("users", req.userId);
+  if (!admin || admin.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+  const jobs = (await findAll("jobs")).sort((a, b) => new Date(b.postedAt || b.posted || 0) - new Date(a.postedAt || a.posted || 0));
+  res.json(jobs);
+});
+
+app.post("/api/admin/jobs", authMiddleware, async (req, res) => {
+  const admin = await findById("users", req.userId);
+  if (!admin || admin.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+
+  const title = String(req.body?.title || "").trim();
+  const company = String(req.body?.company || "").trim();
+  if (!title || !company) return res.status(400).json({ error: "Title and company are required" });
+
+  const tags = Array.isArray(req.body?.tags)
+    ? req.body.tags
+    : String(req.body?.tags || "")
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+
+  const job = {
+    id: randomUUID(),
+    title,
+    company,
+    logo: String(req.body?.logo || company.slice(0, 2).toUpperCase()),
+    location: String(req.body?.location || "Remote"),
+    type: String(req.body?.type || "Full-time"),
+    salary: String(req.body?.salary || "Competitive"),
+    match: Number(req.body?.match || 75),
+    posted: String(req.body?.posted || "Just now"),
+    tags,
+    description: String(req.body?.description || ""),
+    requirements: Array.isArray(req.body?.requirements) ? req.body.requirements : [],
+    benefits: Array.isArray(req.body?.benefits) ? req.body.benefits : [],
+    postedAt: new Date().toISOString(),
+    createdBy: req.userId,
+  };
+  await insertDoc("jobs", job);
+  res.status(201).json({ success: true, id: job.id });
+});
+
+app.delete("/api/admin/jobs/:id", authMiddleware, async (req, res) => {
+  const admin = await findById("users", req.userId);
+  if (!admin || admin.role !== "admin") return res.status(403).json({ error: "Not authorized" });
+  const existing = await findById("jobs", req.params.id);
+  if (!existing) return res.status(404).json({ error: "Job not found" });
+  await deleteDoc("jobs", req.params.id);
+  res.json({ success: true });
+});
+
+// ── Recruiter ────────────────────────────────────────────────────────
+app.get("/api/recruiter/candidates", authMiddleware, async (req, res) => {
+  const actor = await requireRoles(req, res, ["recruiter", "admin"]);
+  if (!actor) return;
+
+  const search = String(req.query.search || "").trim().toLowerCase();
+  const skill = String(req.query.skill || "").trim().toLowerCase();
+  const minExperience = Number(req.query.minExperience || 0);
+
+  const users = await findAll("users", { role: "jobseeker" });
+  const resumes = await findAll("resumes");
+  const assessments = await findAll("user_assessments");
+  const courses = await findAll("user_courses");
+
+  const candidates = users
+    .map((u) => {
+      const userResumes = resumes.filter((r) => r.userId === u.id);
+      const latestResume = userResumes.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0] || null;
+      const experienceYears = latestResume?.experience?.length || 0;
+      const skills = Array.from(new Set([...(u.skills || []), ...(latestResume?.skills || [])]));
+      const completedAssessments = assessments.filter((a) => a.userId === u.id && a.status === "completed");
+      const avgScore = completedAssessments.length
+        ? Math.round(completedAssessments.reduce((sum, a) => sum + (a.score || 0), 0) / completedAssessments.length)
+        : 0;
+      const completedCourses = courses.filter((c) => c.userId === u.id && c.status === "completed").length;
+
+      const { password: _, ...safeUser } = u;
+      return {
+        ...safeUser,
+        skills,
+        stats: {
+          resumes: userResumes.length,
+          experienceYears,
+          completedAssessments: completedAssessments.length,
+          avgScore,
+          completedCourses,
+        },
+      };
+    })
+    .filter((c) => {
+      const searchMatch =
+        !search ||
+        c.name.toLowerCase().includes(search) ||
+        c.email.toLowerCase().includes(search) ||
+        c.title.toLowerCase().includes(search) ||
+        c.location.toLowerCase().includes(search);
+      const skillMatch = !skill || c.skills.some((s) => String(s).toLowerCase().includes(skill));
+      const expMatch = c.stats.experienceYears >= minExperience;
+      return searchMatch && skillMatch && expMatch;
+    })
+    .sort((a, b) => {
+      const scoreA = a.stats.avgScore + a.stats.completedCourses * 2 + a.stats.experienceYears * 3;
+      const scoreB = b.stats.avgScore + b.stats.completedCourses * 2 + b.stats.experienceYears * 3;
+      return scoreB - scoreA;
+    });
+
+  res.json({ candidates, viewerRole: actor.role });
+});
+
+app.get("/api/recruiter/candidates/:id", authMiddleware, async (req, res) => {
+  const actor = await requireRoles(req, res, ["recruiter", "admin"]);
+  if (!actor) return;
+
+  const candidate = await findById("users", req.params.id);
+  if (!candidate || candidate.role !== "jobseeker") {
+    return res.status(404).json({ error: "Candidate not found" });
+  }
+
+  const userResumes = (await findAll("resumes", { userId: candidate.id }))
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  const completedAssessments = await findAll("user_assessments", { userId: candidate.id, status: "completed" });
+  const userCourses = await findAll("user_courses", { userId: candidate.id });
+  const goals = await findAll("career_goals", { userId: candidate.id });
+
+  const { password: _, ...safeUser } = candidate;
+  res.json({
+    candidate: safeUser,
+    resumes: userResumes.map((r) => ({
+      id: r.id,
+      title: r.title,
+      updatedAt: r.updatedAt,
+      completeness: r.completeness || 0,
+      skills: r.skills || [],
+      experience: r.experience || [],
+      summary: r.summary || "",
+    })),
+    insights: {
+      avgAssessmentScore: completedAssessments.length
+        ? Math.round(completedAssessments.reduce((sum, a) => sum + (a.score || 0), 0) / completedAssessments.length)
+        : 0,
+      completedAssessments: completedAssessments.length,
+      completedCourses: userCourses.filter((c) => c.status === "completed").length,
+      activeGoals: goals.filter((g) => g.status !== "completed").length,
+    },
+    viewerRole: actor.role,
+  });
+});
+
+app.get("/api/recruiter/overview", authMiddleware, async (req, res) => {
+  const recruiter = await requireRoles(req, res, ["recruiter", "admin"]);
+  if (!recruiter) return;
+
+  const jobs = await findAll("jobs");
+  const scopedJobs = jobs.filter((j) => jobMatchesRecruiter(j, recruiter));
+  const scopedJobIds = new Set(scopedJobs.map((j) => j.id));
+
+  const applications = (await findAll("job_applications"))
+    .filter((a) => scopedJobIds.has(a.jobId));
+  const statuses = ["applied", "reviewing", "interview", "offered", "rejected"];
+  const byStatus = statuses.reduce((acc, s) => ({ ...acc, [s]: applications.filter((a) => a.status === s).length }), {});
+
+  res.json({
+    stats: {
+      companyJobs: scopedJobs.length,
+      requests: applications.length,
+      byStatus,
+    },
+    recentRequests: applications
+      .sort((a, b) => new Date(b.updatedAt || b.appliedAt) - new Date(a.updatedAt || a.appliedAt))
+      .slice(0, 8),
+  });
+});
+
+app.get("/api/recruiter/requests", authMiddleware, async (req, res) => {
+  const recruiter = await requireRoles(req, res, ["recruiter", "admin"]);
+  if (!recruiter) return;
+
+  const status = String(req.query.status || "").trim().toLowerCase();
+  const search = String(req.query.search || "").trim().toLowerCase();
+
+  const jobs = await findAll("jobs");
+  const scopedJobs = jobs.filter((j) => jobMatchesRecruiter(j, recruiter));
+  const scopedJobMap = new Map(scopedJobs.map((j) => [j.id, j]));
+
+  const users = await findAll("users", { role: "jobseeker" });
+  const userMap = new Map(users.map((u) => [u.id, u]));
+  const resumes = await findAll("resumes");
+  const assessments = await findAll("user_assessments");
+  const chats = await findAll("job_application_chats");
+
+  let requests = (await findAll("job_applications"))
+    .filter((a) => scopedJobMap.has(a.jobId))
+    .map((a) => {
+      const job = scopedJobMap.get(a.jobId);
+      const candidate = userMap.get(a.userId);
+      const candidateResumes = resumes.filter((r) => r.userId === a.userId);
+      const latestResume = candidateResumes.sort((x, y) => new Date(y.updatedAt) - new Date(x.updatedAt))[0] || null;
+      const completedAssessments = assessments.filter((u) => u.userId === a.userId && u.status === "completed");
+      const avgAssessmentScore = completedAssessments.length
+        ? Math.round(completedAssessments.reduce((sum, x) => sum + (x.score || 0), 0) / completedAssessments.length)
+        : 0;
+      const messageCount = chats.filter((m) => m.applicationId === a.id).length;
+
+      return {
+        ...a,
+        job: job ? { id: job.id, title: job.title, company: job.company, location: job.location, type: job.type } : null,
+        candidate: candidate ? {
+          id: candidate.id,
+          name: candidate.name,
+          email: candidate.email,
+          avatar: candidate.avatar,
+          title: candidate.title,
+          location: candidate.location,
+          skills: Array.from(new Set([...(candidate.skills || []), ...(latestResume?.skills || [])])),
+        } : null,
+        profile: {
+          resumeCount: candidateResumes.length,
+          resumeCompleteness: latestResume?.completeness || 0,
+          experienceYears: latestResume?.experience?.length || 0,
+          avgAssessmentScore,
+        },
+        messageCount,
+      };
+    });
+
+  if (status) requests = requests.filter((r) => r.status === status);
+  if (search) {
+    requests = requests.filter((r) =>
+      r.candidate?.name?.toLowerCase().includes(search) ||
+      r.candidate?.email?.toLowerCase().includes(search) ||
+      r.job?.title?.toLowerCase().includes(search) ||
+      r.job?.company?.toLowerCase().includes(search)
+    );
+  }
+
+  requests.sort((a, b) => new Date(b.updatedAt || b.appliedAt) - new Date(a.updatedAt || a.appliedAt));
+  res.json({ requests });
+});
+
+app.put("/api/recruiter/requests/:id/status", authMiddleware, async (req, res) => {
+  const recruiter = await requireRoles(req, res, ["recruiter", "admin"]);
+  if (!recruiter) return;
+
+  const request = await findById("job_applications", req.params.id);
+  if (!request) return res.status(404).json({ error: "Request not found" });
+
+  const job = await findById("jobs", request.jobId);
+  if (!job || !jobMatchesRecruiter(job, recruiter)) return res.status(403).json({ error: "Not authorized for this request" });
+
+  const allowedStatuses = new Set(["applied", "reviewing", "interview", "offered", "rejected"]);
+  const nextStatus = String(req.body?.status || "").toLowerCase();
+  if (!allowedStatuses.has(nextStatus)) return res.status(400).json({ error: "Invalid status" });
+  const recruiterNote = String(req.body?.note || "").trim();
+  const now = new Date().toISOString();
+
+  await updateDoc("job_applications", request.id, {
+    status: nextStatus,
+    recruiterNote,
+    updatedAt: now,
+  });
+
+  await (await col("applied_jobs")).updateMany(
+    { userId: request.userId, company: job.company, title: job.title },
+    { $set: { status: nextStatus, notes: recruiterNote, updatedAt: now } }
+  );
+
+  await insertDoc("notifications", {
+    id: randomUUID(),
+    userId: request.userId,
+    type: "job",
+    title: `Application update: ${job.title}`,
+    description: `Recruiter updated your application to "${nextStatus}".${recruiterNote ? ` Note: ${recruiterNote}` : ""}`,
+    read: false,
+    createdAt: now,
+  });
+
+  res.json({ success: true });
+});
+
+app.get("/api/recruiter/requests/:id/chat", authMiddleware, async (req, res) => {
+  const recruiter = await requireRoles(req, res, ["recruiter", "admin"]);
+  if (!recruiter) return;
+  const request = await findById("job_applications", req.params.id);
+  if (!request) return res.status(404).json({ error: "Request not found" });
+  const job = await findById("jobs", request.jobId);
+  if (!job || !jobMatchesRecruiter(job, recruiter)) return res.status(403).json({ error: "Not authorized for this request" });
+
+  const messages = (await findAll("job_application_chats", { applicationId: request.id }))
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  res.json({ messages });
+});
+
+app.post("/api/recruiter/requests/:id/chat", authMiddleware, async (req, res) => {
+  const recruiter = await requireRoles(req, res, ["recruiter", "admin"]);
+  if (!recruiter) return;
+  const request = await findById("job_applications", req.params.id);
+  if (!request) return res.status(404).json({ error: "Request not found" });
+  const job = await findById("jobs", request.jobId);
+  if (!job || !jobMatchesRecruiter(job, recruiter)) return res.status(403).json({ error: "Not authorized for this request" });
+
+  const text = String(req.body?.text || "").trim();
+  if (!text) return res.status(400).json({ error: "Message is required" });
+  const now = new Date().toISOString();
+
+  const message = {
+    id: randomUUID(),
+    applicationId: request.id,
+    senderId: recruiter.id,
+    senderRole: "recruiter",
+    senderName: recruiter.name,
+    text,
+    createdAt: now,
+  };
+  await insertDoc("job_application_chats", message);
+
+  await insertDoc("notifications", {
+    id: randomUUID(),
+    userId: request.userId,
+    type: "job",
+    title: `Recruiter message for ${job.title}`,
+    description: text.length > 140 ? `${text.slice(0, 140)}...` : text,
+    read: false,
+    createdAt: now,
+  });
+
+  res.status(201).json({ success: true, message });
+});
+
+app.get("/api/applications/:id/chat", authMiddleware, async (req, res) => {
+  const request = await findById("job_applications", req.params.id);
+  if (!request) return res.status(404).json({ error: "Application not found" });
+  const user = await findById("users", req.userId);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  if (user.role === "jobseeker" && request.userId !== user.id) return res.status(403).json({ error: "Not authorized" });
+  if (user.role === "recruiter") {
+    const job = await findById("jobs", request.jobId);
+    if (!job || !jobMatchesRecruiter(job, user)) return res.status(403).json({ error: "Not authorized" });
+  }
+
+  const messages = (await findAll("job_application_chats", { applicationId: request.id }))
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  res.json({ messages });
+});
+
+app.post("/api/applications/:id/chat", authMiddleware, async (req, res) => {
+  const request = await findById("job_applications", req.params.id);
+  if (!request) return res.status(404).json({ error: "Application not found" });
+  const user = await findById("users", req.userId);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  if (user.role !== "jobseeker" || request.userId !== user.id) return res.status(403).json({ error: "Not authorized" });
+
+  const text = String(req.body?.text || "").trim();
+  if (!text) return res.status(400).json({ error: "Message is required" });
+  const now = new Date().toISOString();
+  const message = {
+    id: randomUUID(),
+    applicationId: request.id,
+    senderId: user.id,
+    senderRole: "jobseeker",
+    senderName: user.name,
+    text,
+    createdAt: now,
+  };
+  await insertDoc("job_application_chats", message);
+
+  const job = await findById("jobs", request.jobId);
+  const recruiters = await findAll("users", { role: "recruiter" });
+  const matchedRecruiters = recruiters.filter((r) => jobMatchesRecruiter(job, r));
+  for (const recruiter of matchedRecruiters) {
+    await insertDoc("notifications", {
+      id: randomUUID(),
+      userId: recruiter.id,
+      type: "job",
+      title: `Candidate message for ${job?.title || "application"}`,
+      description: text.length > 140 ? `${text.slice(0, 140)}...` : text,
+      read: false,
+      createdAt: now,
+    });
+  }
+
+  res.status(201).json({ success: true, message });
+});
+
+// ── Career Coach ─────────────────────────────────────────────────────
+app.get("/api/coach/progress", authMiddleware, async (req, res) => {
+  const coach = await requireRoles(req, res, ["coach", "admin"]);
+  if (!coach) return;
+
+  const search = String(req.query.search || "").trim().toLowerCase();
+  const users = await findAll("users", { role: "jobseeker" });
+  const assessments = await findAll("user_assessments");
+  const courses = await findAll("user_courses");
+  const goals = await findAll("career_goals");
+  const notes = await findAll("coach_guidance");
+
+  const progress = users
+    .map((u) => {
+      const userAssessments = assessments.filter((a) => a.userId === u.id && a.status === "completed");
+      const userCourses = courses.filter((c) => c.userId === u.id);
+      const userGoals = goals.filter((g) => g.userId === u.id);
+      const userNotes = notes.filter((n) => n.userId === u.id);
+      const avgAssessmentScore = userAssessments.length
+        ? Math.round(userAssessments.reduce((sum, a) => sum + (a.score || 0), 0) / userAssessments.length)
+        : 0;
+      const goalsProgress = userGoals.length
+        ? Math.round(userGoals.reduce((sum, g) => sum + (g.progress || 0), 0) / userGoals.length)
+        : 0;
+
+      const { password: _, ...safeUser } = u;
+      return {
+        user: safeUser,
+        metrics: {
+          completedAssessments: userAssessments.length,
+          avgAssessmentScore,
+          completedCourses: userCourses.filter((c) => c.status === "completed").length,
+          inProgressCourses: userCourses.filter((c) => c.status === "in-progress").length,
+          goalsProgress,
+          totalGoals: userGoals.length,
+          notesCount: userNotes.length,
+        },
+      };
+    })
+    .filter(({ user }) => {
+      if (!search) return true;
+      return (
+        user.name.toLowerCase().includes(search) ||
+        user.email.toLowerCase().includes(search) ||
+        user.title.toLowerCase().includes(search)
+      );
+    })
+    .sort((a, b) => b.metrics.goalsProgress - a.metrics.goalsProgress);
+
+  res.json({ learners: progress, viewerRole: coach.role });
+});
+
+app.get("/api/coach/overview", authMiddleware, async (req, res) => {
+  const coach = await requireRoles(req, res, ["coach", "admin"]);
+  if (!coach) return;
+
+  const users = await findAll("users", { role: "jobseeker" });
+  const assessments = await findAll("user_assessments");
+  const courses = await findAll("courses");
+  const userCourses = await findAll("user_courses");
+  const goals = await findAll("career_goals");
+  const guidance = await findAll("coach_guidance");
+
+  const learnersCount = users.length;
+  const completedAssessments = assessments.filter((a) => a.status === "completed").length;
+  const avgGoalProgress = goals.length
+    ? Math.round(goals.reduce((sum, g) => sum + (g.progress || 0), 0) / goals.length)
+    : 0;
+  const coachCourses = courses.filter((c) => c.createdBy === coach.id).length;
+  const activeLearners = userCourses.filter((c) => c.status === "in-progress").length;
+  const guidanceCount = guidance.filter((g) => g.coachId === coach.id).length;
+
+  res.json({
+    stats: {
+      learnersCount,
+      completedAssessments,
+      avgGoalProgress,
+      coachCourses,
+      activeLearners,
+      guidanceCount,
+    },
+    recentGuidance: guidance
+      .filter((g) => g.coachId === coach.id)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 8),
+  });
+});
+
+app.get("/api/coach/guidance/:userId", authMiddleware, async (req, res) => {
+  const coach = await requireRoles(req, res, ["coach", "admin"]);
+  if (!coach) return;
+
+  const learner = await findById("users", req.params.userId);
+  if (!learner || learner.role !== "jobseeker") {
+    return res.status(404).json({ error: "Learner not found" });
+  }
+
+  const notes = (await findAll("coach_guidance", { userId: req.params.userId }))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.json({ notes, learner: { id: learner.id, name: learner.name, email: learner.email } });
+});
+
+app.post("/api/coach/guidance/:userId", authMiddleware, async (req, res) => {
+  const coach = await requireRoles(req, res, ["coach", "admin"]);
+  if (!coach) return;
+
+  const learner = await findById("users", req.params.userId);
+  if (!learner || learner.role !== "jobseeker") {
+    return res.status(404).json({ error: "Learner not found" });
+  }
+
+  const text = String(req.body?.text || "").trim();
+  if (!text) return res.status(400).json({ error: "Guidance text is required" });
+
+  const note = {
+    id: randomUUID(),
+    userId: learner.id,
+    coachId: coach.id,
+    coachName: coach.name,
+    text,
+    createdAt: new Date().toISOString(),
+  };
+  await insertDoc("coach_guidance", note);
+  res.status(201).json({ success: true, note });
+});
+
+app.get("/api/coach/content/courses", authMiddleware, async (req, res) => {
+  const coach = await requireRoles(req, res, ["coach", "admin"]);
+  if (!coach) return;
+  const allCourses = await findAll("courses");
+  const courses = allCourses
+    .filter((c) => c.createdBy === coach.id || c.createdByRole === "coach")
+    .sort((a, b) => new Date(b.createdAt || b.postedAt || 0) - new Date(a.createdAt || a.postedAt || 0));
+  res.json({ courses });
+});
+
+app.post("/api/coach/content/courses", authMiddleware, async (req, res) => {
+  const coach = await requireRoles(req, res, ["coach", "admin"]);
+  if (!coach) return;
+
+  const title = String(req.body?.title || "").trim();
+  if (!title) return res.status(400).json({ error: "Course title is required" });
+
+  const videosInput = Array.isArray(req.body?.videos) ? req.body.videos : [];
+  const moduleId = randomUUID();
+  const videos = videosInput
+    .map((v, idx) => ({
+      id: randomUUID(),
+      title: String(v.title || `Video ${idx + 1}`),
+      youtubeId: String(v.youtubeId || ""),
+      duration: String(v.duration || "10 min"),
+      order: idx + 1,
+    }))
+    .filter((v) => v.youtubeId);
+
+  const modules = [
+    {
+      id: moduleId,
+      title: String(req.body?.moduleTitle || "Getting Started"),
+      videos,
+    },
+  ];
+
+  const course = {
+    id: randomUUID(),
+    title,
+    instructor: String(req.body?.instructor || coach.name),
+    thumbnail: String(req.body?.thumbnail || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&q=80"),
+    category: String(req.body?.category || "Development"),
+    duration: String(req.body?.duration || `${Math.max(videos.length * 12, 20)} min`),
+    level: ["Beginner", "Intermediate", "Advanced"].includes(String(req.body?.level))
+      ? String(req.body?.level)
+      : "Beginner",
+    tags: Array.isArray(req.body?.tags)
+      ? req.body.tags
+      : String(req.body?.tags || "")
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean),
+    description: String(req.body?.description || ""),
+    modules,
+    totalVideos: videos.length,
+    playlistId: "",
+    status: "published",
+    createdBy: coach.id,
+    createdByName: coach.name,
+    createdByRole: coach.role,
+    createdAt: new Date().toISOString(),
+  };
+
+  await insertDoc("courses", course);
+
+  const learners = await findAll("users", { role: "jobseeker" });
+  for (const learner of learners) {
+    await insertDoc("notifications", {
+      id: randomUUID(),
+      userId: learner.id,
+      type: "learning",
+      title: "New mentor course published",
+      description: `${coach.name} published "${course.title}".`,
+      read: false,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  res.status(201).json({ success: true, courseId: course.id });
+});
+
+app.post("/api/coach/content/courses/:id/modules", authMiddleware, async (req, res) => {
+  const coach = await requireRoles(req, res, ["coach", "admin"]);
+  if (!coach) return;
+  const course = await findById("courses", req.params.id);
+  if (!course) return res.status(404).json({ error: "Course not found" });
+  if (course.createdBy !== coach.id && coach.role !== "admin") {
+    return res.status(403).json({ error: "Not authorized" });
+  }
+
+  const moduleTitle = String(req.body?.title || "").trim();
+  if (!moduleTitle) return res.status(400).json({ error: "Module title is required" });
+  const nextModules = [...(course.modules || []), { id: randomUUID(), title: moduleTitle, videos: [] }];
+  await updateDoc("courses", course.id, { modules: nextModules, totalVideos: nextModules.reduce((sum, m) => sum + (m.videos?.length || 0), 0) });
+  res.json({ success: true });
+});
+
+app.post("/api/coach/content/courses/:id/modules/:moduleId/videos", authMiddleware, async (req, res) => {
+  const coach = await requireRoles(req, res, ["coach", "admin"]);
+  if (!coach) return;
+  const course = await findById("courses", req.params.id);
+  if (!course) return res.status(404).json({ error: "Course not found" });
+  if (course.createdBy !== coach.id && coach.role !== "admin") {
+    return res.status(403).json({ error: "Not authorized" });
+  }
+
+  const youtubeId = String(req.body?.youtubeId || "").trim();
+  const title = String(req.body?.title || "").trim();
+  if (!youtubeId || !title) return res.status(400).json({ error: "Video title and youtubeId are required" });
+
+  const updatedModules = (course.modules || []).map((m) => {
+    if (m.id !== req.params.moduleId) return m;
+    const nextVideos = [...(m.videos || []), {
+      id: randomUUID(),
+      title,
+      youtubeId,
+      duration: String(req.body?.duration || "10 min"),
+      order: (m.videos || []).length + 1,
+    }];
+    return { ...m, videos: nextVideos };
+  });
+  await updateDoc("courses", course.id, {
+    modules: updatedModules,
+    totalVideos: updatedModules.reduce((sum, m) => sum + (m.videos?.length || 0), 0),
+  });
+  res.json({ success: true });
+});
+
 // ── Resume Preview / Download / Upload / ATS (existing) ─────────────
 app.post("/api/resume/preview", (req, res) => {
   try {
@@ -712,6 +1450,177 @@ app.post("/api/job/suggestions", (req, res) => {
     if (!resumeData) return res.status(400).json({ error: "resumeData is required" });
     res.json(generateSuggestedJobs(resumeData));
   } catch (err) { res.status(500).json({ error: "Failed to generate suggestions", details: err.message }); }
+});
+
+// ── Compatibility endpoints (SRS/Test-case contracts) ───────────────
+app.get("/api/jobs/recommendations", async (req, res) => {
+  try {
+    const header = req.headers.authorization;
+    const token = header && header.startsWith("Bearer ") ? header.slice(7) : null;
+    if (!token) return res.status(401).json({ error: "Authentication token required" });
+    const payload = verifyToken(token);
+    if (!payload?.userId) return res.status(401).json({ error: "Authentication token required" });
+
+    const userId = payload.userId;
+    const [user, resumes] = await Promise.all([
+      findById("users", userId),
+      findAll("resumes", { userId }),
+    ]);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const latestResume = resumes
+      .slice()
+      .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0))[0];
+
+    const resumeData = latestResume
+      ? {
+          personalInfo: latestResume.personalInfo || {},
+          summary: latestResume.summary || "",
+          experience: latestResume.experience || [],
+          education: latestResume.education || [],
+          skills: latestResume.skills || user.skills || [],
+          projects: latestResume.projects || [],
+          certifications: latestResume.certifications || [],
+          languages: latestResume.languages || [],
+          volunteering: latestResume.volunteering || [],
+          awards: latestResume.awards || [],
+          publications: latestResume.publications || [],
+          achievements: latestResume.achievements || [],
+          hobbies: latestResume.hobbies || [],
+        }
+      : {
+          personalInfo: { name: user.name || "", email: user.email || "" },
+          summary: user.bio || "",
+          experience: [],
+          education: [],
+          skills: user.skills || [],
+          projects: [],
+          certifications: [],
+          languages: [],
+          volunteering: [],
+          awards: [],
+          publications: [],
+          achievements: [],
+          hobbies: [],
+        };
+
+    const skills = Array.isArray(resumeData.skills) ? resumeData.skills.filter(Boolean) : [];
+    if (skills.length === 0) {
+      return res.status(200).json({
+        recommendations: [],
+        message: "Complete your profile to get recommendations",
+      });
+    }
+
+    const suggested = generateSuggestedJobs(resumeData);
+    const recommendations = suggested
+      .map((job) => ({
+        id: job.id,
+        title: job.title,
+        company: job.company,
+        match_score: Number(job.match) || 0,
+        type: job.type,
+        salary: job.salary,
+        matched_skills: job.matchedSkills || [],
+      }))
+      .sort((a, b) => b.match_score - a.match_score);
+
+    return res.json({ recommendations });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to fetch recommendations", details: err.message });
+  }
+});
+
+app.post("/api/assessment/submit", authMiddleware, async (req, res) => {
+  try {
+    const assessmentId = String(req.body?.assessmentId || req.body?.id || "").trim();
+    const rawAnswers = Array.isArray(req.body?.answers) ? req.body.answers : [];
+    if (!assessmentId) return res.status(400).json({ error: "assessmentId is required" });
+
+    const assessment = await findById("assessments", assessmentId);
+    if (!assessment) return res.status(404).json({ error: "Assessment not found" });
+
+    const indexFromLetter = (value) => {
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      const str = String(value || "").trim().toUpperCase();
+      const map = { A: 0, B: 1, C: 2, D: 3 };
+      if (Object.prototype.hasOwnProperty.call(map, str)) return map[str];
+      const match = str.match(/^Q\d+\s*:\s*([A-D])$/);
+      if (match) return map[match[1]];
+      return null;
+    };
+
+    const normalizedAnswers = assessment.questions.map((_, idx) => {
+      const source = rawAnswers[idx];
+      if (source && typeof source === "object" && source !== null) {
+        if (source.answer !== undefined) return indexFromLetter(source.answer);
+        if (source.value !== undefined) return indexFromLetter(source.value);
+      }
+      return indexFromLetter(source);
+    });
+
+    let correct = 0;
+    normalizedAnswers.forEach((ans, idx) => {
+      if (ans === assessment.questions[idx]?.correctAnswer) correct++;
+    });
+    const totalQuestions = assessment.questions.length || 1;
+    const percentage = Math.round((correct / totalQuestions) * 100);
+    const status = percentage >= 60 ? "Pass" : "Fail";
+
+    const existing = await (await col("user_assessments")).findOne(
+      { userId: req.userId, assessmentId },
+      { projection: { _id: 0 } }
+    );
+    const now = new Date().toISOString();
+    if (existing) {
+      await updateDoc("user_assessments", existing.id, {
+        answers: normalizedAnswers,
+        score: percentage,
+        status: "completed",
+        currentQuestion: assessment.questions.length,
+        completedAt: now,
+      });
+    } else {
+      await insertDoc("user_assessments", {
+        id: randomUUID(),
+        userId: req.userId,
+        assessmentId,
+        answers: normalizedAnswers,
+        score: percentage,
+        status: "completed",
+        currentQuestion: assessment.questions.length,
+        startedAt: now,
+        completedAt: now,
+      });
+    }
+
+    return res.json({
+      success: true,
+      score: `${correct}/${totalQuestions}`,
+      percentage,
+      status,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to submit assessment", details: err.message });
+  }
+});
+
+app.get("/api/assessment/history", authMiddleware, async (req, res) => {
+  try {
+    const all = await findAll("user_assessments", { userId: req.userId });
+    const completed = all
+      .filter((ua) => ua.status === "completed" && ua.completedAt)
+      .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt))
+      .map((ua) => ({
+        id: ua.id,
+        assessmentId: ua.assessmentId,
+        score: ua.score,
+        date: ua.completedAt,
+      }));
+    return res.json(completed);
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to fetch assessment history", details: err.message });
+  }
 });
 
 // ── Certificate PDF (existing) ──────────────────────────────────────
