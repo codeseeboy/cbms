@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Rocket, Eye, EyeOff, ArrowRight } from "lucide-react"
 
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4002"
+
 export default function LoginPage() {
   const router = useRouter()
   const [error, setError] = useState("")
@@ -25,7 +27,8 @@ export default function LoginPage() {
         password: String(formData.get("password") || ""),
       }
 
-      const authResponse = await fetch("/api/auth/login", {
+      // Step 1: Authenticate via the Express backend (Render)
+      const authResponse = await fetch(`${API}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -35,6 +38,12 @@ export default function LoginPage() {
       if (!authResponse.ok || !authData?.success || !authData?.user?.id) {
         setError(authData?.error || "Login failed")
       } else {
+        // Step 2: Set the session cookie on the frontend domain
+        await fetch("/api/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: authData.user.id }),
+        })
         router.push("/dashboard")
       }
     } catch {
