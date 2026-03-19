@@ -1,7 +1,11 @@
+const path = require("path");
+
+// Load repo-root .env for local dev (Render injects env vars automatically)
+require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
+
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
-const path = require("path");
 const fs = require("fs");
 const { MongoClient } = require("mongodb");
 const { hashSync, compareSync } = require("bcryptjs");
@@ -44,7 +48,10 @@ function getMongoClient() {
     throw new Error("Missing MONGODB_URI in backend environment");
   }
   if (!mongoClientPromise) {
-    mongoClientPromise = new MongoClient(MONGODB_URI).connect();
+    mongoClientPromise = new MongoClient(MONGODB_URI, {
+      serverSelectionTimeoutMS: 8000,
+      connectTimeoutMS: 8000,
+    }).connect();
   }
   return mongoClientPromise;
 }

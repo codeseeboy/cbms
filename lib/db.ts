@@ -1,9 +1,73 @@
 import { MongoClient } from "mongodb"
+import fs from "fs"
+import path from "path"
 
 const MONGODB_DB = process.env.MONGODB_DB || "careerbuilder"
 
 declare global {
   var _mongoClientPromise: Promise<MongoClient> | undefined
+}
+
+// ---- File-based MVP fallback (works on Vercel/Render too) ----
+const DATA_DIR = path.join(process.cwd(), "data")
+const memoryStore = new Map<string, unknown[]>()
+
+function ensureDir() {
+  if (!fs.existsSync(DATA_DIR)) {
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true })
+    } catch {
+      // Read-only filesystem (some hosted runtimes). We'll fall back to in-memory.
+    }
+  }
+}
+
+function fileReadCollection<T>(name: string): T[] {
+  ensureDir()
+  const filePath = path.join(DATA_DIR, `${name}.json`)
+  if (!fs.existsSync(filePath)) {
+    return ((memoryStore.get(name) as T[] | undefined) || []).map((item) => ({ ...item }))
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8")) as T[]
+    memoryStore.set(name, parsed)
+    return parsed
+  } catch {
+    return ((memoryStore.get(name) as T[] | undefined) || []).map((item) => ({ ...item }))
+  }
+}
+
+function fileWriteCollection<T>(name: string, data: T[]): void {
+  ensureDir()
+  const filePath = path.join(DATA_DIR, `${name}.json`)
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2))
+  } catch {
+    // Hosted runtimes may be read-only; keep functional in-memory.
+  }
+  memoryStore.set(name, data)
+}
+
+function isMongoConfigured() {
+  const uri = process.env.MONGODB_URI
+  if (!uri) return false
+  if (uri.includes("<db_username>") || uri.includes("<db_password>")) return false
+  return true
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`Mongo timeout after ${ms}ms`)), ms)
+    promise
+      .then((v) => {
+        clearTimeout(t)
+        resolve(v)
+      })
+      .catch((err) => {
+        clearTimeout(t)
+        reject(err)
+      })
+  })
 }
 
 function getMongoClientPromise() {
@@ -22,6 +86,8 @@ function getMongoClientPromise() {
   global._mongoClientPromise = new MongoClient(mongodbUri, {
     maxPoolSize: 20,
     minPoolSize: 2,
+    serverSelectionTimeoutMS: 8000,
+    connectTimeoutMS: 8000,
   })
     .connect()
     .catch((error) => {
@@ -69,17 +135,38 @@ async function bootstrapDataIfMissing() {
 }
 
 export async function readCollection<T>(name: string): Promise<T[]> {
-  await bootstrapDataIfMissing()
-  const db = await getDb()
-  return db.collection<T>(name).find({}, { projection: { _id: 0 } }).toArray()
+  if (!isMongoConfigured()) {
+    return fileReadCollection<T>(name)
+  }
+  try {
+    const mongoPromise = (async () => {
+      await bootstrapDataIfMissing()
+      const db = await getDb()
+      return await db.collection<T>(name).find({}, { projection: { _id: 0 } }).toArray()
+    })()
+    return await withTimeout(mongoPromise, 8000)
+  } catch {
+    return fileReadCollection<T>(name)
+  }
 }
 
 export async function writeCollection<T>(name: string, data: T[]): Promise<void> {
-  const db = await getDb()
-  const collection = db.collection(name)
-  await collection.deleteMany({})
-  if (data.length > 0) {
-    await collection.insertMany(data as object[])
+  if (!isMongoConfigured()) {
+    fileWriteCollection<T>(name, data)
+    return
+  }
+  try {
+    const mongoPromise = (async () => {
+      const db = await getDb()
+      const collection = db.collection(name)
+      await collection.deleteMany({})
+      if (data.length > 0) {
+        await collection.insertMany(data as object[])
+      }
+    })()
+    await withTimeout(mongoPromise, 8000)
+  } catch {
+    fileWriteCollection<T>(name, data)
   }
 }
 
@@ -103,9 +190,25 @@ export async function insertOne<T extends { id: string }>(
   collection: string,
   item: T
 ): Promise<T> {
-  const db = await getDb()
-  await db.collection(collection).insertOne(item as object)
-  return item
+  if (!isMongoConfigured()) {
+    const items = fileReadCollection<T>(collection)
+    items.push(item)
+    fileWriteCollection(collection, items)
+    return item
+  }
+  try {
+    const mongoPromise = (async () => {
+      const db = await getDb()
+      await db.collection(collection).insertOne(item as object)
+      return item
+    })()
+    return await withTimeout(mongoPromise, 8000)
+  } catch {
+    const items = fileReadCollection<T>(collection)
+    items.push(item)
+    fileWriteCollection(collection, items)
+    return item
+  }
 }
 
 export async function updateOne<T extends { id: string }>(
@@ -113,22 +216,60 @@ export async function updateOne<T extends { id: string }>(
   id: string,
   updates: Partial<T>
 ): Promise<T | null> {
-  const db = await getDb()
-  const result = await db
-    .collection<T>(collection)
-    .findOneAndUpdate(
-      { id } as Partial<T>,
-      { $set: updates as object },
-      { returnDocument: "after", projection: { _id: 0 } }
-    )
-  return result || null
+  if (!isMongoConfigured()) {
+    const items = fileReadCollection<T>(collection)
+    const idx = items.findIndex((i) => i.id === id)
+    if (idx === -1) return null
+    items[idx] = { ...items[idx], ...updates }
+    fileWriteCollection(collection, items)
+    return items[idx] || null
+  }
+  try {
+    const mongoPromise = (async () => {
+      const db = await getDb()
+      const result = await db
+        .collection<T>(collection)
+        .findOneAndUpdate(
+          { id } as Partial<T>,
+          { $set: updates as object },
+          { returnDocument: "after", projection: { _id: 0 } }
+        )
+      return result || null
+    })()
+    return await withTimeout(mongoPromise, 8000)
+  } catch {
+    const items = fileReadCollection<T>(collection)
+    const idx = items.findIndex((i) => i.id === id)
+    if (idx === -1) return null
+    items[idx] = { ...items[idx], ...updates }
+    fileWriteCollection(collection, items)
+    return items[idx] || null
+  }
 }
 
 export async function deleteOne<T extends { id: string }>(
   collection: string,
   id: string
 ): Promise<boolean> {
-  const db = await getDb()
-  const result = await db.collection<T>(collection).deleteOne({ id } as Partial<T>)
-  return result.deletedCount > 0
+  if (!isMongoConfigured()) {
+    const items = fileReadCollection<T>(collection)
+    const filtered = items.filter((i) => i.id !== id)
+    if (filtered.length === items.length) return false
+    fileWriteCollection(collection, filtered)
+    return true
+  }
+  try {
+    const mongoPromise = (async () => {
+      const db = await getDb()
+      const result = await db.collection<T>(collection).deleteOne({ id } as Partial<T>)
+      return result.deletedCount > 0
+    })()
+    return await withTimeout(mongoPromise, 8000)
+  } catch {
+    const items = fileReadCollection<T>(collection)
+    const filtered = items.filter((i) => i.id !== id)
+    if (filtered.length === items.length) return false
+    fileWriteCollection(collection, filtered)
+    return true
+  }
 }

@@ -1,0 +1,200 @@
+classDiagram
+  %% CareerBuilder Management System (CBMS) - simplified UML
+
+  class User {
+    +string id
+    +string name
+    +string email
+    +string role
+    +string[] skills
+    +string avatar
+    +string createdAt
+    +string updatedAt
+  }
+
+  class Resume {
+    +string id
+    +string userId
+    +string title
+    +string template
+    +number completeness
+    +string createdAt
+    +string updatedAt
+  }
+
+  class Job {
+    +string id
+    +string title
+    +string company
+    +string location
+    +string type
+    +string salary
+    +number match
+    +string posted
+  }
+
+  class JobBookmark {
+    +string id
+    +string userId
+    +string jobId
+    +string createdAt
+  }
+
+  class JobApplication {
+    +string id
+    +string userId
+    +string jobId
+    +string status
+    +string appliedAt
+  }
+
+  class AppliedJob {
+    +string id
+    +string userId
+    +string title
+    +string company
+    +string url
+    +string location
+    +number matchScore
+    +string status
+    +string notes
+    +string appliedAt
+    +string updatedAt
+  }
+
+  class Assessment {
+    +string id
+    +string title
+    +string category
+    +string difficulty
+    +string duration
+  }
+
+  class Question {
+    +string id
+    +string question
+    +string[] options
+    +int correctAnswer
+  }
+
+  class UserAssessment {
+    +string id
+    +string userId
+    +string assessmentId
+    +number score
+    +number[] answers
+    +number currentQuestion
+    +string status
+    +string startedAt
+    +string completedAt
+  }
+
+  class Course {
+    +string id
+    +string title
+    +string instructor
+    +string category
+    +string level
+    +string duration
+    +number totalVideos
+  }
+
+  class CourseModule {
+    +string id
+    +string title
+  }
+
+  class CourseVideo {
+    +string id
+    +string title
+    +string youtubeId
+    +string duration
+    +number order
+  }
+
+  class UserCourse {
+    +string id
+    +string userId
+    +string courseId
+    +number progress
+    +string[] watchedVideos
+    +string currentVideoId
+    +string status
+    +string startedAt
+    +string completedAt
+  }
+
+  class Certificate {
+    +string id
+    +string userId
+    +string courseId
+    +string courseTitle
+    +string userName
+    +string issuedAt
+  }
+
+  class CareerGoal {
+    +string id
+    +string userId
+    +string title
+    +string description
+    +string deadline
+    +number progress
+    +string status
+    +string createdAt
+    +string updatedAt
+  }
+
+  class Milestone {
+    +string id
+    +string text
+    +boolean done
+  }
+
+  class Notification {
+    +string id
+    +string userId
+    +string type
+    +string title
+    +string description
+    +boolean read
+    +string createdAt
+  }
+
+  class ActivityLog {
+    +string id
+    +string userId
+    +string action
+    +string type
+    +string createdAt
+  }
+
+  %% =========================
+  %% Relationships (key links)
+  %% =========================
+  User "1" --> "0..*" Resume : owns
+  User "1" --> "0..*" JobBookmark : bookmarks
+  User "1" --> "0..*" JobApplication : applies
+  User "1" --> "0..*" AppliedJob : tracks
+
+  Job "1" --> "0..*" JobBookmark
+  Job "1" --> "0..*" JobApplication
+
+  User "1" --> "0..*" UserAssessment : takes
+  Assessment "1" --> "0..*" Question : contains
+  Assessment "1" --> "0..*" UserAssessment : hasResults
+
+  User "1" --> "0..*" UserCourse : learns
+  Course "1" --> "0..*" CourseModule : hasModules
+  CourseModule "1" --> "0..*" CourseVideo : hasVideos
+  Course "1" --> "0..*" UserCourse : trackedBy
+
+  User "1" --> "0..*" Certificate : receives
+  Course "1" --> "0..*" Certificate : certifies
+
+  User "1" --> "0..*" CareerGoal : defines
+  CareerGoal "1" --> "0..*" Milestone : hasMilestones
+
+  User "1" --> "0..*" Notification : gets
+  User "1" --> "0..*" ActivityLog : generates
+
