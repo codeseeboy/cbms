@@ -1,6 +1,9 @@
 import { cookies } from "next/headers"
+import { getServerApiBaseUrl } from "@/lib/get-api-base-url"
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4002"
+function apiBase() {
+  return getServerApiBaseUrl()
+}
 const COOKIE_NAME = "cb_token"
 
 /** Read the JWT token from the session cookie (server-side only) */
@@ -13,7 +16,9 @@ export async function getToken(): Promise<string | null> {
 export async function apiGet<T = any>(path: string): Promise<T | null> {
   const token = await getToken()
   try {
-    const res = await fetch(`${API}${path}`, {
+    const base = apiBase()
+    if (!base) return null
+    const res = await fetch(`${base}${path}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       cache: "no-store",
     })
@@ -27,7 +32,9 @@ export async function apiGet<T = any>(path: string): Promise<T | null> {
 /** Make an authenticated POST request to the backend */
 export async function apiPost<T = any>(path: string, body?: any): Promise<T> {
   const token = await getToken()
-  const res = await fetch(`${API}${path}`, {
+  const base = apiBase()
+  if (!base) return {} as T
+  const res = await fetch(`${base}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -41,7 +48,9 @@ export async function apiPost<T = any>(path: string, body?: any): Promise<T> {
 /** Make an authenticated PUT request to the backend */
 export async function apiPut<T = any>(path: string, body?: any): Promise<T> {
   const token = await getToken()
-  const res = await fetch(`${API}${path}`, {
+  const base = apiBase()
+  if (!base) return {} as T
+  const res = await fetch(`${base}${path}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -55,7 +64,9 @@ export async function apiPut<T = any>(path: string, body?: any): Promise<T> {
 /** Make an authenticated DELETE request to the backend */
 export async function apiDelete<T = any>(path: string): Promise<T> {
   const token = await getToken()
-  const res = await fetch(`${API}${path}`, {
+  const base = apiBase()
+  if (!base) return {} as T
+  const res = await fetch(`${base}${path}`, {
     method: "DELETE",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   })

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Grotesk } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { BackendConfigWarning } from '@/components/backend-config-warning'
 import { QueryProvider } from './query-provider'
 import './globals.css'
 
@@ -42,7 +43,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${_inter.variable} ${_spaceGrotesk.variable}`}>
       <body className="font-sans antialiased">
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          <BackendConfigWarning />
+          {children}
+        </QueryProvider>
         <Analytics />
       </body>
     </html>

@@ -15,8 +15,7 @@ import {
 } from "lucide-react"
 import { getResumes, createResume, updateResume, deleteResume } from "@/lib/actions/resume"
 import type { Resume } from "@/lib/types"
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4002"
+import { getClientApiBaseUrl } from "@/lib/get-api-base-url"
 
 const TEMPLATES: { id: Resume["template"]; name: string; gradient: string; desc: string }[] = [
   { id: "modern", name: "Modern", gradient: "from-blue-500 to-blue-700", desc: "Two-column with blue header" },
@@ -85,6 +84,9 @@ export default function ResumePage() {
   const dragging = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  /** Production must set NEXT_PUBLIC_API_URL; otherwise browser calls localhost and fails. */
+  const API = getClientApiBaseUrl()
+
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     dragging.current = true
@@ -114,7 +116,16 @@ export default function ResumePage() {
   }, [form, editorOpen])
 
   async function checkServer() {
-    try { const r = await fetch(`${API}/api/health`); if (r.ok) setOnline(true) } catch { setOnline(false) }
+    if (!API) {
+      setOnline(false)
+      return
+    }
+    try {
+      const r = await fetch(`${API}/api/health`)
+      if (r.ok) setOnline(true)
+    } catch {
+      setOnline(false)
+    }
   }
   async function loadResumes() { setResumes(await getResumes()) }
 
@@ -191,7 +202,20 @@ export default function ResumePage() {
   }
 
   async function handleDownload() {
-    if (!online) { alert("Start the resume server: cd server && npm start"); return }
+    if (!API) {
+      alert(
+        "Backend URL is not configured. Set NEXT_PUBLIC_API_URL to your deployed API (e.g. https://your-app.onrender.com) in Vercel/hosting and redeploy."
+      )
+      return
+    }
+    if (!online) {
+      alert(
+        process.env.NODE_ENV === "production"
+          ? "Cannot reach the resume API. Verify NEXT_PUBLIC_API_URL and that your Render service is running."
+          : "Start the resume server: cd server && npm run dev"
+      )
+      return
+    }
     setDownloading(true)
     try {
       const r = await fetch(`${API}/api/resume/download`, {
@@ -205,13 +229,27 @@ export default function ResumePage() {
       a.download = `${form.personalInfo.name || "Resume"}_Resume.pdf`
       document.body.appendChild(a); a.click(); document.body.removeChild(a)
       URL.revokeObjectURL(a.href)
-    } catch { alert("PDF generation failed. Is the resume server running on port 4002?") }
+    } catch {
+      alert(
+        process.env.NODE_ENV === "production"
+          ? "PDF download failed. Check the API URL, CORS, and that Puppeteer works on your host (Render)."
+          : "PDF generation failed. Is the resume server running on port 4002?"
+      )
+    }
     setDownloading(false)
   }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file || !online) { if (!online) alert("Start the resume server first."); return }
+    if (!file) return
+    if (!API) {
+      alert("Backend URL is not configured. Set NEXT_PUBLIC_API_URL and redeploy.")
+      return
+    }
+    if (!online) {
+      alert(process.env.NODE_ENV === "production" ? "Cannot reach the resume API." : "Start the resume server first.")
+      return
+    }
     setUploading(true)
     try {
       const fd = new globalThis.FormData(); fd.append("file", file)

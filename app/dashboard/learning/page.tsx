@@ -15,11 +15,12 @@ import {
   setCurrentVideo, getCertificates,
 } from "@/lib/actions/learning"
 import type { Course, UserCourse, Certificate, CourseModule, CourseVideo } from "@/lib/types"
+import { getClientApiBaseUrl } from "@/lib/get-api-base-url"
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4002"
 const categories = ["All", "Development", "DevOps", "Design"]
 
 export default function LearningPage() {
+  const API = getClientApiBaseUrl()
   const [activeCategory, setActiveCategory] = useState("All")
   const [searchQuery, setSearchQuery] = useState("")
   const [courses, setCourses] = useState<Course[]>([])
@@ -37,7 +38,16 @@ export default function LearningPage() {
   useEffect(() => { loadData(); checkServer() }, [])
 
   async function checkServer() {
-    try { const r = await fetch(`${API}/api/health`); if (r.ok) setOnline(true) } catch { setOnline(false) }
+    if (!API) {
+      setOnline(false)
+      return
+    }
+    try {
+      const r = await fetch(`${API}/api/health`)
+      if (r.ok) setOnline(true)
+    } catch {
+      setOnline(false)
+    }
   }
 
   async function loadData() {
@@ -130,7 +140,14 @@ export default function LearningPage() {
   }
 
   async function handleDownloadCertificate(cert: Certificate) {
-    if (!online) { alert("Server offline"); return }
+    if (!API) {
+      alert("Backend URL is not configured. Set NEXT_PUBLIC_API_URL to your API (e.g. Render URL) and redeploy.")
+      return
+    }
+    if (!online) {
+      alert(process.env.NODE_ENV === "production" ? "Cannot reach the API. Check NEXT_PUBLIC_API_URL." : "Server offline.")
+      return
+    }
     setDownloadingCert(true)
     try {
       const r = await fetch(`${API}/api/certificate/download`, {
@@ -150,7 +167,13 @@ export default function LearningPage() {
       a.download = `${cert.userName}_${cert.courseTitle}_Certificate.pdf`
       document.body.appendChild(a); a.click(); document.body.removeChild(a)
       URL.revokeObjectURL(a.href)
-    } catch { alert("Certificate download failed.") }
+    } catch {
+      alert(
+        process.env.NODE_ENV === "production"
+          ? "Certificate download failed. Check API URL and that Puppeteer is supported on Render."
+          : "Certificate download failed."
+      )
+    }
     setDownloadingCert(false)
   }
 

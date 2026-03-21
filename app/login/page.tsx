@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Rocket, Eye, EyeOff, ArrowRight } from "lucide-react"
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4002"
+import { getClientApiBaseUrl } from "@/lib/get-api-base-url"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -21,6 +21,15 @@ export default function LoginPage() {
     setLoading(true)
     setError("")
     try {
+      const API = getClientApiBaseUrl()
+      if (!API) {
+        setError(
+          "Server URL is not configured. Set NEXT_PUBLIC_API_URL to your API (e.g. https://your-app.onrender.com) and redeploy."
+        )
+        setLoading(false)
+        return
+      }
+
       const formData = new FormData(event.currentTarget)
       const payload = {
         email: String(formData.get("email") || ""),

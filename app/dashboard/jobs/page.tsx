@@ -15,8 +15,7 @@ import {
 import { getResumes } from "@/lib/actions/resume"
 import { getAppliedJobs, getJobs, saveAppliedJob, updateAppliedJobStatus, deleteAppliedJob } from "@/lib/actions/jobs"
 import type { Resume, AppliedJob, Job } from "@/lib/types"
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4002"
+import { getClientApiBaseUrl } from "@/lib/get-api-base-url"
 
 type Tab = "match" | "applied" | "suggested"
 
@@ -48,6 +47,7 @@ interface JobDetail {
 }
 
 export default function JobsPage() {
+  const API = getClientApiBaseUrl()
   const [tab, setTab] = useState<Tab>("match")
   const [resumes, setResumes] = useState<Resume[]>([])
   const [appliedJobs, setAppliedJobs] = useState<AppliedJob[]>([])
@@ -77,6 +77,13 @@ export default function JobsPage() {
   }, [])
 
   async function checkServer() {
+    if (!API) {
+      setOnline(false)
+      setServerError(
+        "Backend URL is not configured. Set NEXT_PUBLIC_API_URL to your Render API URL and redeploy."
+      )
+      return
+    }
     try {
       const r = await fetch(`${API}/api/health`, { signal: AbortSignal.timeout(5000) })
       if (r.ok) { setOnline(true); setServerError(null) }
@@ -156,7 +163,11 @@ export default function JobsPage() {
       return
     }
     if (!online) {
-      setServerError("Cannot match — server is offline. Please start the server on localhost:4002.")
+      setServerError(
+        process.env.NODE_ENV === "production"
+          ? "Cannot match — API unreachable. Check NEXT_PUBLIC_API_URL and your Render deployment."
+          : "Cannot match — server is offline. Start the server (cd server && npm run dev)."
+      )
       return
     }
     setMatching(true)
