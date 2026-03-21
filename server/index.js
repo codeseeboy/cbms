@@ -150,13 +150,58 @@ async function ensureSeeded() {
   seeded = true;
 }
 
-// ── Puppeteer (lazy) ─────────────────────────────────────────────────
+// ── Puppeteer / Chromium (lazy) ───────────────────────────────────────
+// Render and many hosts cannot run Puppeteer's bundled Chrome. When RENDER=true (set by Render),
+// we use @sparticuz/chromium + puppeteer-core. Override with PUPPETEER_EXECUTABLE_PATH if needed.
+async function resetBrowser() {
+  if (!browserInstance) return;
+  try {
+    await browserInstance.close();
+  } catch (_) {}
+  browserInstance = null;
+}
+
 async function getBrowser() {
   if (browserInstance) return browserInstance;
+
+  const extraArgs = [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu",
+    "--font-render-hinting=none",
+  ];
+
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    const puppeteer = require("puppeteer-core");
+    browserInstance = await puppeteer.launch({
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+      args: extraArgs,
+    });
+    return browserInstance;
+  }
+
+  if (process.env.RENDER === "true" || process.env.USE_SPARTICUZ_CHROMIUM === "1") {
+    const chromium = require("@sparticuz/chromium");
+    const puppeteer = require("puppeteer-core");
+    if (typeof chromium.setGraphicsMode === "function") {
+      chromium.setGraphicsMode(false);
+    }
+    const executablePath = await chromium.executablePath();
+    browserInstance = await puppeteer.launch({
+      args: [...chromium.args, ...extraArgs],
+      defaultViewport: chromium.defaultViewport,
+      executablePath,
+      headless: chromium.headless ?? true,
+    });
+    return browserInstance;
+  }
+
   const puppeteer = require("puppeteer");
   browserInstance = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--font-render-hinting=none", "--single-process"],
+    args: [...extraArgs, "--single-process"],
   });
   return browserInstance;
 }
@@ -1394,7 +1439,11 @@ app.post("/api/resume/download", async (req, res) => {
     const fileName = `${(resumeData.personalInfo?.name || "Resume").replace(/[^a-zA-Z0-9 ]/g, "_")}_Resume.pdf`;
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${fileName}"`, "Content-Length": Buffer.byteLength(pdf), "Cache-Control": "no-cache" });
     res.end(pdf);
-  } catch (err) { console.error("PDF error:", err); res.status(500).json({ error: "Failed to generate PDF", details: err.message }); }
+  } catch (err) {
+    console.error("PDF error (resume):", err);
+    await resetBrowser();
+    res.status(500).json({ error: "Failed to generate PDF", details: err.message });
+  }
 });
 
 app.post("/api/resume/upload", upload.single("file"), async (req, res) => {
@@ -1637,7 +1686,11 @@ app.post("/api/certificate/download", async (req, res) => {
     const fileName = `${(userName || "Certificate").replace(/[^a-zA-Z0-9 ]/g, "_")}_Certificate.pdf`;
     res.set({ "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${fileName}"`, "Content-Length": Buffer.byteLength(pdf), "Cache-Control": "no-cache" });
     res.end(pdf);
-  } catch (err) { res.status(500).json({ error: "Failed to generate certificate", details: err.message }); }
+  } catch (err) {
+    console.error("PDF error (certificate):", err);
+    await resetBrowser();
+    res.status(500).json({ error: "Failed to generate certificate", details: err.message });
+  }
 });
 
 app.post("/api/certificate/preview", (req, res) => {
@@ -1649,7 +1702,7 @@ app.post("/api/certificate/preview", (req, res) => {
 });
 
 // ── Start ────────────────────────────────────────────────────────────
-process.on("SIGINT", async () => { if (browserInstance) await browserInstance.close(); process.exit(); });
+process.on("SIGINT", async () => { await resetBrowser(); process.exit(); });
 
 app.listen(PORT, () => {
   console.log(`\n  CareerBuilder Backend Server`);

@@ -43,12 +43,20 @@ If that variable is **missing** when the Next.js app is **built**, the client bu
 
 ## 3. PDF / certificate generation on Render
 
-Resume PDF and certificate endpoints use **Puppeteer** (Chromium). On Render this can fail if:
+Resume PDF and certificate endpoints use **headless Chromium** via Puppeteer.
 
-- The instance is too small (memory)  
-- Chromium is not installed in the environment  
+**What this repo does**
 
-If PDFs fail only in production, check Render logs and consider upgrading the plan or using a Docker image that includes Chromium. The app now surfaces clearer errors when the API is unreachable vs. when Puppeteer fails.
+- **Render** sets `RENDER=true`. The server then uses **`@sparticuz/chromium` + `puppeteer-core`**, which is the usual way to run PDF generation on cloud hosts (the default Puppeteer Chrome bundle often fails there).
+- **Local dev** keeps using full `puppeteer` + downloaded Chrome (via `postinstall`).
+
+**If PDFs still fail**
+
+1. Check **Render logs** for OOM or Chromium errors — upgrade to a plan with more **RAM** (PDF + Chromium is heavy).
+2. Optionally set **`USE_SPARTICUZ_CHROMIUM=1`** if you deploy somewhere that behaves like Render but does not set `RENDER`.
+3. Advanced: set **`PUPPETEER_EXECUTABLE_PATH`** to a Chrome/Chromium binary you control (e.g. custom Docker image).
+
+The frontend may still show “Puppeteer / Render” if the **request never reaches** the API — fix **`NEXT_PUBLIC_API_URL`** on Vercel first, then retry PDF from the deployed site.
 
 ---
 
